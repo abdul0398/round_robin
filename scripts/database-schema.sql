@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS participants (
     leads_received INT DEFAULT 0,
     queue_position INT NOT NULL,
     is_external BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (round_robin_id) REFERENCES round_robins (id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
