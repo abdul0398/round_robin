@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS round_robins (
 );
 
 -- RR Participants (agents in the round robin)
-CREATE TABLE IF NOT EXISTS rr_participants (
+CREATE TABLE IF NOT EXISTS participants (
     id INT PRIMARY KEY AUTO_INCREMENT,
     round_robin_id INT NOT NULL,
     user_id INT,
