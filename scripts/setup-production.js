@@ -194,6 +194,7 @@ async function setupProduction() {
       throw adminError;
     }
 
+
     await dbConnection.end();
 
     console.log("\n🎉 Setup completed successfully!\n");

@@ -1,5 +1,6 @@
 const { pool } = require("../config/database");
 const LeadLogger = require("../utils/LeadLogger");
+const Participant = require("./Participant");
 
 class RoundRobin {
   // Create a new round robin
@@ -26,17 +27,30 @@ class RoundRobin {
 
       const roundRobinId = rrResult.insertId;
 
-      // Insert participants
+      // Handle participants: create new ones in global participants table first
       if (participants.length > 0) {
         for (let i = 0; i < participants.length; i++) {
           const participant = participants[i];
+          let participantId = participant.userId;
+          
+          // If this is a new participant (isExternal = true), create it in the global participants table first
+          if (participant.isExternal && !participant.userId) {
+            participantId = await Participant.create({
+              name: participant.name,
+              discordName: participant.discordName,
+              discordWebhook: participant.discordWebhook
+            });
+          }
+          
+          // Now create the round robin participant association
           await connection.execute(
             `INSERT INTO rr_participants 
-                         (round_robin_id, user_id, name, discord_name, discord_webhook, 
+                         (round_robin_id, participant_id, user_id, name, discord_name, discord_webhook, 
                           lead_limit, queue_position, is_external) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               roundRobinId,
+              participantId,
               participant.userId || null,
               participant.name,
               participant.discordName || null,
@@ -343,13 +357,25 @@ class RoundRobin {
       if (participants.length > 0) {
         for (let i = 0; i < participants.length; i++) {
           const participant = participants[i];
+          let participantId = participant.userId;
+          
+          // If this is a new participant (isExternal = true), create it in the global participants table first
+          if (participant.isExternal && !participant.userId) {
+            participantId = await Participant.create({
+              name: participant.name,
+              discordName: participant.discordName,
+              discordWebhook: participant.discordWebhook
+            });
+          }
+          
           await connection.execute(
             `INSERT INTO rr_participants 
-                         (round_robin_id, user_id, name, discord_name, discord_webhook, 
+                         (round_robin_id, participant_id, user_id, name, discord_name, discord_webhook, 
                           lead_limit, queue_position, is_external) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               id,
+              participantId,
               participant.userId || null,
               participant.name,
               participant.discordName || null,
