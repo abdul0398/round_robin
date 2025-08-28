@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('../../partials/head', { title: 'Manage Round Robins - JJ Leads RR System' }) %>
+
+    <body>
+        <div class="container">
+            <%- include('../../partials/header') %>
+                <%- include('../../partials/navigation', { activeSection: 'manage-rr' }) %>
+
+                    <div class="section active">
+                        <h2>Manage Round Robins</h2>
+
+                        <div style="margin:10px 0px 20px 0px;">
+                            <a href="/round-robins/create" class="btn-primary">+ Create New Round Robin</a>
+                        </div>
+
+                        <div id="manageRRList">
+                            <% if (roundRobins && roundRobins.length> 0) { %>
+                                <% roundRobins.forEach(rr=> { %>
+                                    <div
+                                        style="background: white; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                            <div>
+                                                <h3 style="color: #002655;">
+                                                    <%= rr.name %>
+                                                </h3>
+                                                <small style="color: #6c757d;">Created: <%= new
+                                                        Date(rr.created_at).toLocaleDateString() %></small>
+                                            </div>
+                                            <div>
+                                                <a href="/round-robins/<%= rr.id %>" class="btn-secondary">View</a>
+                                                <a href="/round-robins/<%= rr.id %>/edit" class="btn-secondary">Edit</a>
+                                                <button class="btn-danger"
+                                                    onclick="deleteRR(<%= rr.id %>)">Delete</button>
+                                            </div>
+                                        </div>
+                                        <p style="color: #666; margin-bottom: 15px;">
+                                            <%= rr.description || 'No description' %>
+                                        </p>
+                                        <div
+                                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+                                            <div
+                                                style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                                <strong>
+                                                    <%= rr.participant_count || 0 %>
+                                                </strong><br>
+                                                <small>Agents</small>
+                                            </div>
+                                            <div
+                                                style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                                <strong>
+                                                    <%= rr.total_leads || 0 %>
+                                                </strong><br>
+                                                <small>Total Leads</small>
+                                            </div>
+                                            <div
+                                                style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                                <strong>
+                                                    <%= rr.is_launched ? 'Live' : 'Draft' %>
+                                                </strong><br>
+                                                <small>Status</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <% }) %>
+
+                                        <% if (pagination && pagination.pages> 1) { %>
+                                            <div style="text-align: center; margin-top: 20px;">
+                                                <% for (let i=1; i <=pagination.pages; i++) { %>
+                                                    <% if (i===pagination.page) { %>
+                                                        <span class="btn-primary" style="margin: 0 5px;">
+                                                            <%= i %>
+                                                        </span>
+                                                        <% } else { %>
+                                                            <a href="/round-robins?page=<%= i %>" class="btn-secondary"
+                                                                style="margin: 0 5px;">
+                                                                <%= i %>
+                                                            </a>
+                                                            <% } %>
+                                                                <% } %>
+                                            </div>
+                                            <% } %>
+                                                <% } else { %>
+                                                    <div
+                                                        style="text-align: center; padding: 60px 20px; color: #6c757d;">
+                                                        <h3>No Round Robins Yet</h3>
+                                                        <p>Create your first round robin to get started!</p>
+                                                        <a href="/round-robins/create" class="btn-primary"
+                                                            style="display: inline-block; margin-top: 15px;">Create
+                                                            Round Robin</a>
+                                                    </div>
+                                                    <% } %>
+                        </div>
+                    </div>
+        </div>
+
+        <script>
+            function deleteRR(rrId) {
+                if (confirm('Are you sure you want to delete this Round Robin? This action cannot be undone.')) {
+                    fetch(`/round-robins/${rrId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert('✓ Round Robin deleted successfully!');
+                                location.reload();
+                            } else {
+                                alert('Failed to delete round robin: ' + (data.error || 'Unknown error'));
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Failed to delete round robin');
+                        });
+                }
+            }
+        </script>
+    </body>
+
+</html>

@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JJ Leads RR System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: #002655;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0, 38, 85, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .main-nav {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: #002655;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 38, 85, 0.2);
+        }
+
+        .nav-btn:hover {
+            background: #003876;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 38, 85, 0.3);
+        }
+
+        .nav-btn.active {
+            background: #0056b3;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #002655;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #002655;
+        }
+
+        .btn-primary {
+            background: #002655;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 12px rgba(0, 38, 85, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: #003876;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .rr-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .rr-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .rr-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .rr-card h3 {
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .rr-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .queue-list {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .queue-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .queue-item.draggable {
+            cursor: move;
+        }
+
+        .queue-item:hover {
+            transform: translateX(5px);
+        }
+
+        .queue-item.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+
+        .queue-item.drag-over {
+            border-top: 3px solid #002655;
+        }
+
+        .person-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .person-avatar {
+            width: 50px;
+            height: 50px;
+            background: #002655;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .person-details h4 {
+            color: #002655;
+            margin-bottom: 5px;
+        }
+
+        .person-details p {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+
+        .lead-stats {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+            color: #495057;
+            border: 1px solid #e9ecef;
+        }
+
+        .stat-item.current-leads {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+
+        .stat-item.available-leads {
+            background: linear-gradient(135deg, #17a2b8, #6f42c1);
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+
+        .queue-position {
+            background: #002655;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #002655 0%, #003876 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 2% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 95%;
+            max-width: 1000px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .current-next {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .current-agent, .next-agent {
+            flex: 1;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .current-agent {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+
+        .next-agent {
+            background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
+            color: white;
+        }
+
+        .person-type-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .type-btn {
+            padding: 8px 16px;
+            border: 2px solid #002655;
+            background: white;
+            color: #002655;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .type-btn.active {
+            background: #002655;
+            color: white;
+        }
+
+        .launch-status {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .launch-status.launched {
+            background: #28a745;
+            color: white;
+        }
+
+        .url-selector {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+        }
+
+        .url-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .selected-urls {
+            margin-top: 15px;
+            display: none;
+        }
+
+        .selected-urls.show {
+            display: block;
+        }
+
+        .url-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .url-tag {
+            background: linear-gradient(135deg, #002655, #003876);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .url-tag .remove-url {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: background 0.2s ease;
+        }
+
+        .url-tag .remove-url:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .leads-table-container {
+            background: white;
+            border-radius: 8px;
+            overflow-x: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-top: 15px;
+        }
+
+        .leads-table {
+            width: 100%;
+            min-width: 800px;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        .leads-table thead {
+            background: #002655;
+            color: white;
+        }
+
+        .leads-table th,
+        .leads-table td {
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .leads-table th {
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .lead-row:hover {
+            background: #f8f9fa;
+        }
+
+        .lead-date {
+            font-size: 0.8em;
+            color: #6c757d;
+        }
+
+        .lead-info strong {
+            color: #002655;
+        }
+
+        .lead-info small {
+            color: #6c757d;
+        }
+
+        .agent-tag {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .agent-avatar {
+            width: 28px;
+            height: 28px;
+            background: #002655;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+
+        .source-tag {
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            color: #495057;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 500;
+            cursor: help;
+            position: relative;
+        }
+
+        .status-badge[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            white-space: nowrap;
+            z-index: 1000;
+            font-size: 0.8em;
+            margin-bottom: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .status-badge[title]:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid #333;
+            margin-bottom: -5px;
+            z-index: 1000;
+        }
+
+        .status-badge.sent {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-badge.junk {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-badge.spam {
+            background: #f6c23e;
+            color: #1f2937;
+            border: 1px solid #f4b619;
+        }
+
+        .status-badge.pending {
+            background: #cce5ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+
+        .action-btn.view:hover {
+            background: #138496;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .main-nav {
+                flex-direction: column;
+            }
+            
+            .nav-btn {
+                width: 100%;
+            }
+            
+            .current-next {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>JJ-RR Leads</h1>
+            <p>Round Robin Distribution System - Manage your leads efficiently</p>
+        </div>
+
+        <div class="main-nav">
+            <button class="nav-btn active" onclick="showSection('dashboard')">Dashboard</button>
+            <button class="nav-btn" onclick="showSection('create-rr')">Create RR</button>
+            <button class="nav-btn" onclick="showSection('manage-rr')">Manage RRs</button>
+            <button class="nav-btn" onclick="showSection('users')">Users</button>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="section active">
+            <h2>Dashboard Overview</h2>
+            
+            <div class="dashboard-stats">
+                <div class="stat-card">
+                    <h3 id="totalRRs">3</h3>
+                    <p>Active Round Robins</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="totalLeads">147</h3>
+                    <p>Total Leads Distributed</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="totalAgents">12</h3>
+                    <p>Active Agents</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="todayLeads">8</h3>
+                    <p>Today's Leads</p>
+                </div>
+            </div>
+
+            <h3>Active Round Robins</h3>
+            <div class="rr-grid" id="rrGrid">
+                <!-- RR cards will be populated here -->
+            </div>
+        </div>
+
+        <!-- Create RR Section -->
+        <div id="create-rr" class="section">
+            <h2>Create New Round Robin</h2>
+            
+            <form id="createRRForm">
+                <div class="form-group">
+                    <label for="rrName">Round Robin Name</label>
+                    <input type="text" id="rrName" placeholder="e.g., Premium Condo Leads" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="rrDescription">Description (Optional)</label>
+                    <textarea id="rrDescription" rows="3" placeholder="Brief description of this round robin"></textarea>
+                </div>
+
+                <h3>Add People to Round Robin</h3>
+                <div id="peopleContainer">
+                    <!-- People will be added here -->
+                </div>
+
+                <button type="button" class="btn-secondary" onclick="addPersonField()">+ Add Person</button>
+                <br><br>
+                <h3>Lead Source URLs</h3>
+                <div class="form-group">
+                    <label for="urlSelection">Select or Add URLs</label>
+                    <div class="url-selector">
+                        <select id="urlDropdown" onchange="addUrlFromDropdown()">
+                            <option value="">Select from existing URLs...</option>
+                            <option value="https://propertyguru.com.sg">PropertyGuru Singapore</option>
+                            <option value="https://srx.com.sg">SRX Property</option>
+                            <option value="https://99.co">99.co Singapore</option>
+                            <option value="https://edgeprop.sg">EdgeProp</option>
+                            <option value="https://iproperty.com.sg">iProperty</option>
+                        </select>
+                        <div style="margin: 10px 0; text-align: center; color: #6c757d;">OR</div>
+                        <div class="url-input-group">
+                            <input type="url" id="newUrlInput" placeholder="Enter new URL (e.g., https://example.com)" style="flex: 1;">
+                            <button type="button" class="btn-secondary" onclick="addNewUrl()" style="margin-left: 10px;">Add URL</button>
+                        </div>
+                    </div>
+                    
+                    <div class="selected-urls" id="selectedUrls">
+                        <h4 style="margin: 15px 0 10px 0; color: #002655;">Selected URLs:</h4>
+                        <div class="url-tags" id="urlTags">
+                            <!-- Selected URLs will appear here -->
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary">Create Round Robin</button>
+            </form>
+        </div>
+
+        <!-- Manage RR Section -->
+        <div id="manage-rr" class="section">
+            <h2>Manage Round Robins</h2>
+            <div id="manageRRList">
+                <!-- Management interface will be populated here -->
+            </div>
+        </div>
+
+        <!-- Users Section -->
+        <div id="users" class="section">
+            <h2>User Management</h2>
+            
+            <button class="btn-primary" onclick="showModal('addUserModal')">+ Add New User</button>
+            
+            <div class="queue-list" id="usersList">
+                <!-- Users will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addUserModal')">&times;</span>
+            <h2>Add New User</h2>
+            <form id="addUserForm">
+                <div class="form-group">
+                    <label for="userName">Name</label>
+                    <input type="text" id="userName" required>
+                </div>
+                <div class="form-group">
+                    <label for="userDiscord">Discord Name</label>
+                    <input type="text" id="userDiscord" placeholder="e.g., username#1234" required>
+                </div>
+                <div class="form-group">
+                    <label for="userWebhook">Discord Webhook</label>
+                    <input type="url" id="userWebhook" placeholder="https://discord.com/api/webhooks/..." required>
+                </div>
+                <button type="submit" class="btn-primary">Add User</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- RR Details Modal -->
+    <div id="rrDetailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('rrDetailsModal')">&times;</span>
+            <div id="rrDetailsContent">
+                <!-- RR details will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let roundRobins = [];
+        let users = [];
+        let draggedElement = null;
+        let selectedUrls = []; // Store selected URLs for the current RR
+
+        // Initialize with sample data
+        function initializeData() {
+            users = [
+                { id: 1, name: "Sarah Lim", discordName: "sarah_lim#1234", webhook: "https://discord.com/api/webhooks/123/abc" },
+                { id: 2, name: "Michael Chen", discordName: "mike_chen#5678", webhook: "https://discord.com/api/webhooks/456/def" },
+                { id: 3, name: "Jennifer Wong", discordName: "jenny_w#9012", webhook: "https://discord.com/api/webhooks/789/ghi" },
+                { id: 4, name: "David Tan", discordName: "david_tan#3456", webhook: "https://discord.com/api/webhooks/012/jkl" },
+                { id: 5, name: "Rachel Lee", discordName: "rachel_lee#7890", webhook: "https://discord.com/api/webhooks/345/mno" }
+            ];
+
+            roundRobins = [
+                {
+                    id: 2,
+                    name: "HDB Resale",
+                    description: "HDB resale property leads",
+                    selectedUrls: ["https://99.co", "https://edgeprop.sg"],
+                    people: [
+                        { ...users[3], queuePosition: 0, leadsReceived: 18, leadLimit: 30 },
+                        { ...users[4], queuePosition: 1, leadsReceived: 16, leadLimit: 25 }
+                    ],
+                    totalLeads: 34,
+                    currentPosition: 0,
+                    isLaunched: false,
+                    createdDate: new Date('2024-02-15'),
+                    leads: []
+                },
+                {
+                    id: 1,
+                    name: "Premium Condos",
+                    description: "High-end condominium leads",
+                    selectedUrls: ["https://propertyguru.com.sg", "https://srx.com.sg"],
+                    people: [
+                        { ...users[0], queuePosition: 0, leadsReceived: 12, leadLimit: 20 },
+                        { ...users[1], queuePosition: 1, leadsReceived: 8, leadLimit: 15 },
+                        { ...users[2], queuePosition: 2, leadsReceived: 5, leadLimit: 25 }
+                    ],
+                    totalLeads: 33,
+                    currentPosition: 1,
+                    isLaunched: true,
+                    createdDate: new Date('2024-01-15'),
+                    leads: [
+                        {
+                            id: 1,
+                            name: "John Lim",
+                            phone: "+65 9123 4567",
+                            email: "john.lim@email.com",
+                            source: "https://propertyguru.com.sg",
+                            assignedTo: users[0],
+                            receivedAt: new Date('2024-01-20T10:30:00'),
+                            status: "sent"
+                        },
+                        {
+                            id: 2,
+                            name: "Mary Tan",
+                            phone: "+65 9234 5678",
+                            email: "mary.tan@email.com",
+                            source: "https://srx.com.sg",
+                            assignedTo: users[1],
+                            receivedAt: new Date('2024-01-20T14:15:00'),
+                            status: "junk",
+                            statusReason: "Duplicate inquiry from same person"
+                        },
+                        {
+                            id: 3,
+                            name: "Alex Wong",
+                            phone: "+65 9345 6789",
+                            email: "alex.wong@email.com",
+                            source: "https://propertyguru.com.sg",
+                            assignedTo: users[2],
+                            receivedAt: new Date('2024-01-21T09:45:00'),
+                            status: "spam",
+                            statusReason: "Fake contact details provided"
+                        }
+                    ]
+                }
+            ];
+
+            updateDashboard();
+            populateRRGrid();
+            populateUsersList();
+            populateManageRR();
+        }
+
+        // Navigation functions
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(sectionId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Helper functions
+        function formatDateTime(date) {
+            return new Date(date).toLocaleString('en-SG', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatDateShort(date) {
+            return new Date(date).toLocaleDateString('en-SG', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+
+        // Modal functions
+        function showModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Dashboard functions
+        function updateDashboard() {
+            const totalLeads = roundRobins.reduce((sum, rr) => sum + rr.totalLeads, 0);
+            const totalAgents = users.length;
+            const activeRRs = roundRobins.length;
+            
+            document.getElementById('totalRRs').textContent = activeRRs;
+            document.getElementById('totalLeads').textContent = totalLeads;
+            document.getElementById('totalAgents').textContent = totalAgents;
+            document.getElementById('todayLeads').textContent = Math.floor(Math.random() * 15) + 5;
+        }
+
+        function populateRRGrid() {
+            const grid = document.getElementById('rrGrid');
+            grid.innerHTML = '';
+            
+            // Sort round robins by creation date (newest first)
+            const sortedRRs = [...roundRobins].sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+            
+            sortedRRs.forEach(rr => {
+                const card = document.createElement('div');
+                card.className = 'rr-card';
+                card.onclick = () => showRRDetails(rr.id);
+                
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">${rr.name}</h3>
+                        <small style="color: rgba(255,255,255,0.8); font-size: 0.8em; text-align: right;">
+                            ${formatDateShort(rr.createdDate)}
+                        </small>
+                    </div>
+                    <p style="margin-bottom: 20px;">${rr.description}</p>
+                    <div class="rr-stats">
+                        <div class="stat">
+                            <div class="stat-number">${rr.people.length}</div>
+                            <div class="stat-label">Agents</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">${rr.totalLeads}</div>
+                            <div class="stat-label">Leads</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-number">${rr.isLaunched ? 'Live' : 'Draft'}</div>
+                            <div class="stat-label">Status</div>
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        // RR Details functions
+        function showRRDetails(rrId) {
+            const rr = roundRobins.find(r => r.id === rrId);
+            if (!rr) return;
+            
+            const currentAgent = rr.people[rr.currentPosition];
+            const nextPosition = (rr.currentPosition + 1) % rr.people.length;
+            const nextAgent = rr.people[nextPosition];
+            
+            const content = document.getElementById('rrDetailsContent');
+            content.innerHTML = `
+                <h2>${rr.name}
+                    <span class="launch-status ${rr.isLaunched ? 'launched' : 'draft'}">
+                        ${rr.isLaunched ? 'LIVE' : 'DRAFT'}
+                    </span>
+                </h2>
+                <p>${rr.description}</p>
+                
+                ${rr.selectedUrls && rr.selectedUrls.length > 0 ? `
+                <div style="margin: 15px 0;">
+                    <h4 style="color: #002655; margin-bottom: 10px;">Lead Sources:</h4>
+                    <div class="url-tags">
+                        ${rr.selectedUrls.map(url => `
+                            <div class="url-tag" style="background: linear-gradient(135deg, #17a2b8, #6f42c1);">
+                                <span>${getDomainFromUrl(url)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${rr.isLaunched ? `
+                <div class="current-next">
+                    <div class="current-agent">
+                        <h3>Current Agent</h3>
+                        <h4>${currentAgent.name}</h4>
+                        <p>Leads Received: ${currentAgent.leadsReceived}</p>
+                    </div>
+                    <div class="next-agent">
+                        <h3>Next Agent</h3>
+                        <h4>${nextAgent.name}</h4>
+                        <p>Leads Received: ${nextAgent.leadsReceived}</p>
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div class="dashboard-stats">
+                    <div class="stat-card">
+                        <h3>${rr.totalLeads}</h3>
+                        <p>Total Leads</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${rr.people.length}</h3>
+                        <p>Total Agents</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${rr.isLaunched ? 'Active' : 'Ready'}</h3>
+                        <p>Status</p>
+                    </div>
+                </div>
+                
+                <h3>Queue Management ${rr.isLaunched ? '(Read Only - RR is Live)' : '(Drag to Reorder)'}</h3>
+                <div class="queue-list" id="queueList-${rrId}">
+                    ${rr.people.map((person, index) => `
+                        <div class="queue-item ${rr.isLaunched ? '' : 'draggable'}" 
+                             data-person-id="${person.id || person.name}" 
+                             data-index="${index}"
+                             ${rr.isLaunched ? '' : 'draggable="true"'}>
+                            <div class="person-info">
+                                <div class="person-avatar">${person.name.split(' ').map(n => n[0]).join('')}</div>
+                                <div class="person-details">
+                                    <h4>${person.name}</h4>
+                                    <p>Discord: ${person.discordName}</p>
+                                    <div class="lead-stats">
+                                        <span class="stat-item">Limit: ${person.leadLimit || 15}</span>
+                                        <span class="stat-item current-leads">Current: ${person.leadsReceived}</span>
+                                        <span class="stat-item available-leads">Available: ${(person.leadLimit || 15) - person.leadsReceived}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="queue-position">
+                                Position ${index + 1}
+                                ${rr.isLaunched && index === rr.currentPosition ? ' (Current)' : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    ${rr.isLaunched ? `
+                        <button class="btn-primary" onclick="simulateLead(${rrId})">Simulate Lead</button>
+                    ` : `
+                        <button class="btn-primary" onclick="launchRR(${rrId})">Launch RR</button>
+                    `}
+                    <button class="btn-secondary" onclick="editRR(${rrId})">Edit Details</button>
+                    <button class="btn-danger" onclick="deleteRR(${rrId})">Delete RR</button>
+                </div>
+                
+                ${rr.isLaunched && rr.leads && rr.leads.length > 0 ? `
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #002655; margin-bottom: 15px;">Received Leads History</h3>
+                    <div class="leads-table-container">
+                        <table class="leads-table">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Lead Info</th>
+                                    <th>Assigned To</th>
+                                    <th>Source</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rr.leads.map((lead, index) => `
+                                    <tr class="lead-row">
+                                        <td class="lead-date">${formatDateTime(lead.receivedAt)}</td>
+                                        <td class="lead-info">
+                                            <strong>${lead.name || 'Unknown'}</strong><br>
+                                            <small>${lead.phone || ''} | ${lead.email || ''}</small>
+                                        </td>
+                                        <td class="lead-agent">
+                                            <div class="agent-tag">
+                                                <span class="agent-avatar">${lead.assignedTo.name.split(' ').map(n => n[0]).join('')}</span>
+                                                ${lead.assignedTo.name}
+                                            </div>
+                                        </td>
+                                        <td class="lead-source">
+                                            <span class="source-tag">${getDomainFromUrl(lead.source)}</span>
+                                        </td>
+                                        <td class="lead-status">
+                                            <span class="status-badge ${lead.status}" 
+                                                  ${lead.status === 'junk' || lead.status === 'spam' ? `title="Reason: ${lead.statusReason}"` : ''}>
+                                                ${getStatusDisplay(lead.status)}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            
+            // Add drag and drop functionality if not launched
+            if (!rr.isLaunched) {
+                setupDragAndDrop(rrId);
+            }
+            
+            showModal('rrDetailsModal');
+        }
+
+        // Helper functions for leads table
+        function getStatusDisplay(status) {
+            const statusMap = {
+                'sent': 'Sent to Discord',
+                'junk': 'Marked as Junk',
+                'spam': 'Marked as Spam',
+                'pending': 'Pending'
+            };
+            return statusMap[status] || status;
+        }
+
+        function markAsJunk(rrId, leadIndex) {
+            const reason = prompt('Please provide a reason for marking this lead as junk:');
+            if (reason) {
+                const rr = roundRobins.find(r => r.id === rrId);
+                if (rr && rr.leads[leadIndex]) {
+                    rr.leads[leadIndex].status = 'junk';
+                    rr.leads[leadIndex].statusReason = reason;
+                    showRRDetails(rrId); // Refresh the modal
+                }
+            }
+        }
+
+        function markAsSpam(rrId, leadIndex) {
+            const reason = prompt('Please provide a reason for marking this lead as spam:');
+            if (reason) {
+                const rr = roundRobins.find(r => r.id === rrId);
+                if (rr && rr.leads[leadIndex]) {
+                    rr.leads[leadIndex].status = 'spam';
+                    rr.leads[leadIndex].statusReason = reason;
+                    showRRDetails(rrId); // Refresh the modal
+                }
+            }
+        }
+
+        function viewLeadDetails(rrId, leadIndex) {
+            const rr = roundRobins.find(r => r.id === rrId);
+            const lead = rr.leads[leadIndex];
+            
+            alert(`Lead Details:
+Name: ${lead.name}
+Phone: ${lead.phone}
+Email: ${lead.email}
+Source: ${lead.source}
+Received: ${formatDateTime(lead.receivedAt)}
+Assigned to: ${lead.assignedTo.name}
+Status: ${getStatusDisplay(lead.status)}
+${lead.statusReason ? 'Reason: ' + lead.statusReason : ''}`);
+        }
+
+        // Drag and Drop functionality
+        function setupDragAndDrop(rrId) {
+            const queueList = document.getElementById(`queueList-${rrId}`);
+            const draggableItems = queueList.querySelectorAll('.draggable');
+            
+            draggableItems.forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('drop', handleDrop);
+                item.addEventListener('dragend', handleDragEnd);
+            });
+        }
+
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+            return false;
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            if (draggedElement !== this) {
+                const container = this.parentElement;
+                const allItems = Array.from(container.children);
+                
+                const draggedIndex = allItems.indexOf(draggedElement);
+                const targetIndex = allItems.indexOf(this);
+                
+                if (draggedIndex < targetIndex) {
+                    container.insertBefore(draggedElement, this.nextSibling);
+                } else {
+                    container.insertBefore(draggedElement, this);
+                }
+                
+                updateQueueOrder(container);
+            }
+            
+            return false;
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            
+            const allItems = document.querySelectorAll('.queue-item');
+            allItems.forEach(item => item.classList.remove('drag-over'));
+        }
+
+        function updateQueueOrder(container) {
+            const rrId = parseInt(container.id.split('-')[1]);
+            const rr = roundRobins.find(r => r.id === rrId);
+            
+            if (rr) {
+                const newOrder = [];
+                const items = container.children;
+                
+                for (let i = 0; i < items.length; i++) {
+                    const personId = items[i].dataset.personId;
+                    const person = rr.people.find(p => (p.id && p.id.toString() === personId) || p.name === personId);
+                    if (person) {
+                        person.queuePosition = i;
+                        newOrder.push(person);
+                    }
+                }
+                
+                rr.people = newOrder;
+                
+                for (let i = 0; i < items.length; i++) {
+                    const positionElement = items[i].querySelector('.queue-position');
+                    positionElement.textContent = `Position ${i + 1}`;
+                }
+            }
+        }
+
+        // URL Management Functions
+        function addUrlFromDropdown() {
+            const dropdown = document.getElementById('urlDropdown');
+            const selectedUrl = dropdown.value;
+            
+            if (selectedUrl && !selectedUrls.includes(selectedUrl)) {
+                selectedUrls.push(selectedUrl);
+                updateUrlDisplay();
+                dropdown.value = ''; // Reset dropdown
+            }
+        }
+
+        function addNewUrl() {
+            const input = document.getElementById('newUrlInput');
+            const newUrl = input.value.trim();
+            
+            if (newUrl && isValidUrl(newUrl) && !selectedUrls.includes(newUrl)) {
+                selectedUrls.push(newUrl);
+                updateUrlDisplay();
+                input.value = ''; // Clear input
+            } else if (newUrl && !isValidUrl(newUrl)) {
+                alert('Please enter a valid URL (must start with http:// or https://)');
+            } else if (selectedUrls.includes(newUrl)) {
+                alert('This URL has already been added');
+            }
+        }
+
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return string.startsWith('http://') || string.startsWith('https://');
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function updateUrlDisplay() {
+            const urlTags = document.getElementById('urlTags');
+            const selectedUrlsContainer = document.getElementById('selectedUrls');
+            
+            if (selectedUrls.length > 0) {
+                selectedUrlsContainer.classList.add('show');
+                urlTags.innerHTML = selectedUrls.map((url, index) => `
+                    <div class="url-tag">
+                        <span>${getDomainFromUrl(url)}</span>
+                        <button class="remove-url" onclick="removeUrl(${index})" title="Remove URL">×</button>
+                    </div>
+                `).join('');
+            } else {
+                selectedUrlsContainer.classList.remove('show');
+            }
+        }
+
+        function removeUrl(index) {
+            selectedUrls.splice(index, 1);
+            updateUrlDisplay();
+        }
+
+        function getDomainFromUrl(url) {
+            try {
+                return new URL(url).hostname;
+            } catch (_) {
+                return url;
+            }
+        }
+        function addPersonField() {
+            const container = document.getElementById('peopleContainer');
+            const personDiv = document.createElement('div');
+            personDiv.className = 'person-field';
+            personDiv.style.cssText = 'background: #f8f9fa; padding: 20px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #002655;';
+            
+            personDiv.innerHTML = `
+                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="color: #002655;">Person ${container.children.length + 1}</h4>
+                    <button type="button" class="btn-danger" onclick="this.parentElement.parentElement.remove()" style="margin-left: auto;">Remove</button>
+                </div>
+                
+                <div class="person-type-selector">
+                    <button type="button" class="type-btn active" onclick="togglePersonType(this, 'existing')">Existing User</button>
+                    <button type="button" class="type-btn" onclick="togglePersonType(this, 'new')">New Person</button>
+                </div>
+                
+                <div class="existing-user-fields">
+                    <div class="form-group">
+                        <label>Select User</label>
+                        <select class="user-select" required>
+                            <option value="">Select a user...</option>
+                            ${users.map(user => `<option value="${user.id}">${user.name} (${user.discordName})</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="new-user-fields" style="display: none;">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" class="new-user-name" placeholder="Enter person's name">
+                    </div>
+                    <div class="form-group">
+                        <label>Discord Name</label>
+                        <input type="text" class="new-user-discord" placeholder="e.g., username#1234">
+                    </div>
+                    <div class="form-group">
+                        <label>Discord Webhook</label>
+                        <input type="url" class="new-user-webhook" placeholder="https://discord.com/api/webhooks/...">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Lead Limit</label>
+                    <input type="number" class="lead-limit" placeholder="e.g., 15" min="1" value="15">
+                </div>
+            `;
+            
+            container.appendChild(personDiv);
+        }
+
+        function togglePersonType(button, type) {
+            const personField = button.closest('.person-field');
+            const buttons = personField.querySelectorAll('.type-btn');
+            const existingFields = personField.querySelector('.existing-user-fields');
+            const newFields = personField.querySelector('.new-user-fields');
+            
+            buttons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            if (type === 'existing') {
+                existingFields.style.display = 'block';
+                newFields.style.display = 'none';
+                newFields.querySelectorAll('input').forEach(input => input.value = '');
+            } else {
+                existingFields.style.display = 'none';
+                newFields.style.display = 'block';
+                existingFields.querySelector('select').value = '';
+            }
+        }
+
+        function handleFileUpload(input) {
+            // Function removed - no longer needed
+        }
+
+        document.getElementById('createRRForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('rrName').value;
+            const description = document.getElementById('rrDescription').value;
+            const personFields = document.querySelectorAll('.person-field');
+            
+            if (personFields.length === 0) {
+                alert('Please add at least one person to the round robin.');
+                return;
+            }
+            
+            const people = [];
+            personFields.forEach((field, index) => {
+                const isExistingUser = field.querySelector('.type-btn.active').textContent === 'Existing User';
+                const leadLimit = field.querySelector('.lead-limit').value;
+                
+                let personData;
+                if (isExistingUser) {
+                    const userId = field.querySelector('.user-select').value;
+                    if (userId) {
+                        const user = users.find(u => u.id == userId);
+                        personData = { ...user };
+                    }
+                } else {
+                    const name = field.querySelector('.new-user-name').value;
+                    const discordName = field.querySelector('.new-user-discord').value;
+                    const webhook = field.querySelector('.new-user-webhook').value;
+                    
+                    if (name && discordName && webhook) {
+                        personData = {
+                            id: Date.now() + index,
+                            name,
+                            discordName,
+                            webhook,
+                            isNewUser: true
+                        };
+                    }
+                }
+                
+                if (personData) {
+                    people.push({
+                        ...personData,
+                        leadLimit: parseInt(leadLimit) || 15,
+                        queuePosition: index,
+                        leadsReceived: 0
+                    });
+                }
+            });
+            
+            const newRR = {
+                id: Date.now(),
+                name,
+                description,
+                people,
+                selectedUrls: [...selectedUrls], // Store the URLs
+                totalLeads: 0,
+                currentPosition: 0,
+                isLaunched: false,
+                createdDate: new Date()
+            };
+            
+            roundRobins.push(newRR);
+            
+            document.getElementById('createRRForm').reset();
+            document.getElementById('peopleContainer').innerHTML = '';
+            
+            updateDashboard();
+            populateRRGrid();
+            populateManageRR();
+            
+            alert('✓ Round Robin created successfully!');
+            showSection('dashboard');
+        });
+
+        // Manage RR functions
+        function populateManageRR() {
+            const container = document.getElementById('manageRRList');
+            container.innerHTML = '';
+            
+            // Sort round robins by creation date (newest first)
+            const sortedRRs = [...roundRobins].sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate));
+            
+            sortedRRs.forEach(rr => {
+                const div = document.createElement('div');
+                div.style.cssText = 'background: white; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
+                
+                div.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div>
+                            <h3 style="color: #002655;">${rr.name}</h3>
+                            <small style="color: #6c757d;">Created: ${formatDateTime(rr.createdDate)}</small>
+                        </div>
+                        <div>
+                            <button class="btn-secondary" onclick="showRRDetails(${rr.id})">View</button>
+                            <button class="btn-secondary" onclick="editRR(${rr.id})">Edit</button>
+                            <button class="btn-danger" onclick="deleteRR(${rr.id})">Delete</button>
+                        </div>
+                    </div>
+                    <p style="color: #666; margin-bottom: 15px;">${rr.description}</p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+                        <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                            <strong>${rr.people.length}</strong><br>
+                            <small>Agents</small>
+                        </div>
+                        <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                            <strong>${rr.totalLeads}</strong><br>
+                            <small>Total Leads</small>
+                        </div>
+                        <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                            <strong>${rr.isLaunched ? 'Live' : 'Draft'}</strong><br>
+                            <small>Status</small>
+                        </div>
+                        <div style="text-align: center; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                            <strong>${rr.people[rr.currentPosition]?.name || 'N/A'}</strong><br>
+                            <small>Current Agent</small>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+
+        // Users management functions
+        function populateUsersList() {
+            const container = document.getElementById('usersList');
+            container.innerHTML = '';
+            
+            users.forEach(user => {
+                const div = document.createElement('div');
+                div.className = 'queue-item';
+                
+                div.innerHTML = `
+                    <div class="person-info">
+                        <div class="person-avatar">${user.name.split(' ').map(n => n[0]).join('')}</div>
+                        <div class="person-details">
+                            <h4>${user.name}</h4>
+                            <p>Discord: ${user.discordName}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn-secondary" onclick="editUser(${user.id})">Edit</button>
+                        <button class="btn-danger" onclick="deleteUser(${user.id})">Delete</button>
+                    </div>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+
+        document.getElementById('addUserForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('userName').value;
+            const discordName = document.getElementById('userDiscord').value;
+            const webhook = document.getElementById('userWebhook').value;
+            
+            const newUser = {
+                id: Date.now(),
+                name,
+                discordName,
+                webhook
+            };
+            
+            users.push(newUser);
+            
+            this.reset();
+            closeModal('addUserModal');
+            
+            populateUsersList();
+            updateDashboard();
+            
+            alert('✓ User added successfully!');
+        });
+
+        // Utility functions
+        function simulateLead(rrId) {
+            const rr = roundRobins.find(r => r.id === rrId);
+            if (!rr || !rr.isLaunched) {
+                alert('Round Robin must be launched before distributing leads.');
+                return;
+            }
+            
+            const currentAgent = rr.people[rr.currentPosition];
+            currentAgent.leadsReceived++;
+            rr.totalLeads++;
+            
+            // Generate a sample lead
+            const sampleNames = ["David Lee", "Sarah Ng", "Michael Chua", "Jessica Tan", "Robert Lim"];
+            const samplePhones = ["+65 9111 2222", "+65 9333 4444", "+65 9555 6666", "+65 9777 8888", "+65 9999 0000"];
+            const sampleEmails = ["lead1@email.com", "lead2@email.com", "lead3@email.com", "lead4@email.com", "lead5@email.com"];
+            
+            const randomIndex = Math.floor(Math.random() * sampleNames.length);
+            const randomSource = rr.selectedUrls && rr.selectedUrls.length > 0 
+                ? rr.selectedUrls[Math.floor(Math.random() * rr.selectedUrls.length)]
+                : "https://propertyguru.com.sg";
+            
+            const newLead = {
+                id: Date.now(),
+                name: sampleNames[randomIndex],
+                phone: samplePhones[randomIndex],
+                email: sampleEmails[randomIndex],
+                source: randomSource,
+                assignedTo: { ...currentAgent },
+                receivedAt: new Date(),
+                status: "sent"
+            };
+            
+            // Initialize leads array if it doesn't exist
+            if (!rr.leads) {
+                rr.leads = [];
+            }
+            
+            rr.leads.push(newLead);
+            
+            // Move to next agent
+            rr.currentPosition = (rr.currentPosition + 1) % rr.people.length;
+            
+            updateDashboard();
+            populateRRGrid();
+            showRRDetails(rrId);
+            
+            alert(`✓ Lead assigned to ${currentAgent.name}!`);
+        }
+
+        function launchRR(rrId) {
+            if (confirm('Are you sure you want to launch this Round Robin? You won\'t be able to edit the queue after launching.')) {
+                const rr = roundRobins.find(r => r.id === rrId);
+                if (rr) {
+                    rr.isLaunched = true;
+                    updateDashboard();
+                    populateRRGrid();
+                    populateManageRR();
+                    showRRDetails(rrId);
+                    alert('✓ Round Robin launched successfully!');
+                }
+            }
+        }
+
+        function editRR(rrId) {
+            alert('Edit functionality would open a detailed queue management interface here.');
+        }
+
+        function deleteRR(rrId) {
+            if (confirm('Are you sure you want to delete this Round Robin? This action cannot be undone.')) {
+                roundRobins = roundRobins.filter(rr => rr.id !== rrId);
+                updateDashboard();
+                populateRRGrid();
+                populateManageRR();
+                closeModal('rrDetailsModal');
+                alert('✓ Round Robin deleted successfully!');
+            }
+        }
+
+        function editUser(userId) {
+            alert('Edit user functionality would open here.');
+        }
+
+        function deleteUser(userId) {
+            if (confirm('Are you sure you want to delete this user?')) {
+                users = users.filter(user => user.id !== userId);
+                populateUsersList();
+                updateDashboard();
+                alert('✓ User deleted successfully!');
+            }
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+
+        // Initialize the application
+        window.onload = function() {
+            initializeData();
+        }
+    </script>
+</body>
+</html>

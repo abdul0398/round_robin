@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('../../partials/head', { title: 'Create Round Robin - JJ Leads RR System' }) %>
+
+    <body>
+        <div class="container">
+            <%- include('../../partials/header') %>
+                <%- include('../../partials/navigation', { activeSection: 'create-rr' }) %>
+
+                    <div class="section active">
+                        <h2>Create New Round Robin</h2>
+
+                        <% if (typeof error !=='undefined' && error) { %>
+                            <div class="alert alert-danger">
+                                <%= error %>
+                            </div>
+                            <% } %>
+
+                                <form id="createRRForm" action="/round-robins" method="POST">
+                                    <div class="form-group">
+                                        <label for="name">Round Robin Name</label>
+                                        <input type="text" id="name" name="name" placeholder="e.g., Premium Condo Leads"
+                                            required>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="description">Description (Optional)</label>
+                                        <textarea id="description" name="description" rows="3"
+                                            placeholder="Brief description of this round robin"></textarea>
+                                    </div>
+
+                                    <h3>Add People to Round Robin</h3>
+
+                                    <div class="form-group">
+                                        <label>Select from existing participants:</label>
+                                        <select id="participantDropdown" onchange="addParticipantFromDropdown()">
+                                            <option value="">Select an existing participant...</option>
+                                            <!-- Options will be loaded via JavaScript -->
+                                        </select>
+                                    </div>
+
+                                    <div style="margin: 15px 0; text-align: center; color: #6c757d;">OR</div>
+
+                                    <button type="button" class="btn-secondary" onclick="addPersonField()">+ Add New
+                                        Person</button>
+
+                                    <div id="peopleContainer">
+                                        <!-- People will be added here via JavaScript -->
+                                    </div>
+
+                                    <br>
+
+                                    <h3>Lead Source URLs <span style="color: red;">*</span></h3>
+                                    <div class="form-group">
+                                        <label for="urlSelection">Select or Add URLs (Required)</label>
+                                        <div class="url-selector">
+                                            <select id="urlDropdown" onchange="addUrlFromDropdown()">
+                                                <option value="">Select from existing URLs...</option>
+                                                <option value="https://propertyguru.com.sg">PropertyGuru Singapore
+                                                </option>
+                                                <option value="https://srx.com.sg">SRX Property</option>
+                                                <option value="https://99.co">99.co Singapore</option>
+                                                <option value="https://edgeprop.sg">EdgeProp</option>
+                                                <option value="https://iproperty.com.sg">iProperty</option>
+                                            </select>
+                                            <div style="margin: 10px 0; text-align: center; color: #6c757d;">OR</div>
+                                            <div class="url-input-group">
+                                                <input type="url" id="newUrlInput"
+                                                    placeholder="Enter new URL (e.g., https://example.com)"
+                                                    style="flex: 1;">
+                                                <button type="button" class="btn-secondary" onclick="addNewUrl()"
+                                                    style="margin-left: 10px;">Add URL</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="selected-urls" id="selectedUrls">
+                                            <h4 style="margin: 15px 0 10px 0; color: #002655;">Selected URLs:</h4>
+                                            <div class="url-tags" id="urlTags">
+                                                <!-- Selected URLs will appear here -->
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" class="btn-primary">Create Round Robin</button>
+                                </form>
+                    </div>
+        </div>
+
+        <script>
+            // Global variables for create form
+            let selectedUrls = [];
+            let availableParticipants = [];
+
+            // Initialize create form
+            document.addEventListener('DOMContentLoaded', function () {
+                initializeCreateForm();
+            });
+
+            function initializeCreateForm() {
+                // Setup form submission
+                document.getElementById('createRRForm').addEventListener('submit', handleCreateRRSubmit);
+
+                // Initialize URL selection
+                initializeUrlSelection();
+
+                // Load participants
+                loadParticipants();
+            }
+
+            // Load participants from API
+            function loadParticipants() {
+                fetch('/api/participants')
+                    .then(response => response.json())
+                    .then(participants => {
+                        availableParticipants = participants;
+                        updateParticipantDropdown();
+                    })
+                    .catch(error => {
+                        console.error('Error loading participants:', error);
+                    });
+            }
+
+            function updateParticipantDropdown() {
+                const dropdown = document.getElementById('participantDropdown');
+
+                // Clear existing options (except the first one)
+                while (dropdown.children.length > 1) {
+                    dropdown.removeChild(dropdown.lastChild);
+                }
+
+                // Add participant options
+                availableParticipants.forEach(participant => {
+                    const option = document.createElement('option');
+                    option.value = participant.id;
+                    option.textContent = `${participant.name} (${participant.discord_name})`;
+                    dropdown.appendChild(option);
+                });
+            }
+
+            function addParticipantFromDropdown() {
+                const dropdown = document.getElementById('participantDropdown');
+                const participantId = parseInt(dropdown.value);
+
+                if (!participantId) return;
+
+                const participant = availableParticipants.find(p => p.id === participantId);
+                if (!participant) return;
+
+                // Check if already added
+                const container = document.getElementById('peopleContainer');
+                const existingParticipants = Array.from(container.querySelectorAll('.person-field')).map(field => {
+                    const idInput = field.querySelector('.participant-id');
+                    return idInput ? parseInt(idInput.value) : null;
+                }).filter(id => id !== null);
+
+                if (existingParticipants.includes(participantId)) {
+                    alert('This participant has already been added.');
+                    dropdown.value = '';
+                    return;
+                }
+
+                addParticipantField(participant);
+                dropdown.value = '';
+            }
+
+            function addParticipantField(participant) {
+                const container = document.getElementById('peopleContainer');
+                const personDiv = document.createElement('div');
+                personDiv.className = 'person-field';
+
+                personDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="color: #002655;">${participant.name} (Existing Participant)</h4>
+                    <button type="button" class="btn-danger" onclick="this.parentElement.parentElement.remove()">Remove</button>
+                </div>
+                
+                <input type="hidden" class="participant-id" value="${participant.id}">
+                <input type="hidden" class="person-name" value="${participant.name}">
+                <input type="hidden" class="person-discord" value="${participant.discord_name}">
+                <input type="hidden" class="person-webhook" value="${participant.discord_webhook}">
+                
+                <div class="form-group">
+                    <label>Name:</label>
+                    <p style="margin: 5px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">${participant.name}</p>
+                </div>
+                <div class="form-group">
+                    <label>Discord Name:</label>
+                    <p style="margin: 5px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">${participant.discord_name}</p>
+                </div>
+                <div class="form-group">
+                    <label>Lead Limit for this Round Robin:</label>
+                    <input type="number" class="lead-limit" placeholder="e.g., 15" min="1" value="15" required>
+                </div>
+            `;
+
+                container.appendChild(personDiv);
+            }
+
+            // Handle form submission
+            function handleCreateRRSubmit(e) {
+                e.preventDefault();
+
+                const formData = new FormData(e.target);
+                const peopleFields = document.querySelectorAll('.person-field');
+
+                if (peopleFields.length === 0) {
+                    alert('Please add at least one person to the round robin.');
+                    return;
+                }
+
+                // Collect participants data
+                const participants = [];
+                peopleFields.forEach((field, index) => {
+                    const participantIdInput = field.querySelector('.participant-id');
+                    const name = field.querySelector('.person-name').value;
+                    const discordName = field.querySelector('.person-discord').value;
+                    const webhook = field.querySelector('.person-webhook').value;
+                    const leadLimit = field.querySelector('.lead-limit').value;
+
+                    if (name && discordName && webhook) {
+                        participants.push({
+                            userId: participantIdInput ? parseInt(participantIdInput.value) : null,
+                            name: name,
+                            discordName: discordName,
+                            discordWebhook: webhook,
+                            leadLimit: parseInt(leadLimit) || 15,
+                            isExternal: !participantIdInput // New person if no participant ID
+                        });
+                    }
+                });
+
+                if (participants.length === 0) {
+                    alert('Please add at least one valid participant.');
+                    return;
+                }
+                
+                // Validate lead sources
+                if (selectedUrls.length === 0) {
+                    // Highlight the URL section
+                    const urlSection = document.getElementById('selectedUrls').parentElement;
+                    urlSection.style.border = '2px solid #dc3545';
+                    urlSection.style.borderRadius = '8px';
+                    urlSection.style.padding = '10px';
+                    alert('Please add at least one lead source URL.');
+                    
+                    // Remove highlight after 3 seconds
+                    setTimeout(() => {
+                        urlSection.style.border = '';
+                        urlSection.style.padding = '';
+                    }, 3000);
+                    
+                    return;
+                }
+
+                // Prepare form data
+                const submitData = {
+                    name: formData.get('name'),
+                    description: formData.get('description'),
+                    participants: participants,
+                    leadSources: selectedUrls
+                };
+
+                // Submit via fetch
+                fetch('/round-robins', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(submitData)
+                })
+                    .then(response => {
+                        if (response.redirected) {
+                            window.location.href = response.url;
+                            return;
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data && data.error) {
+                            alert('Error: ' + data.error);
+                        } else {
+                            alert('✓ Round Robin created successfully!');
+                            window.location.href = '/dashboard';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Failed to create round robin. Please try again.');
+                    });
+            }
+
+            // Person field management
+            function addPersonField() {
+                const container = document.getElementById('peopleContainer');
+                const personDiv = document.createElement('div');
+                personDiv.className = 'person-field';
+
+                personDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="color: #002655;">Person ${container.children.length + 1}</h4>
+                    <button type="button" class="btn-danger" onclick="this.parentElement.parentElement.remove()">Remove</button>
+                </div>
+                
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" class="person-name" placeholder="Enter person's name" required>
+                </div>
+                <div class="form-group">
+                    <label>Discord Name</label>
+                    <input type="text" class="person-discord" placeholder="e.g., username#1234" required>
+                </div>
+                <div class="form-group">
+                    <label>Discord Webhook</label>
+                    <input type="url" class="person-webhook" placeholder="https://discord.com/api/webhooks/..." required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Lead Limit for this Round Robin</label>
+                    <input type="number" class="lead-limit" placeholder="e.g., 15" min="1" value="15" required>
+                </div>
+            `;
+
+                container.appendChild(personDiv);
+            }
+
+
+            // URL Management Functions
+            function initializeUrlSelection() {
+                const urlDropdown = document.getElementById('urlDropdown');
+                const newUrlInput = document.getElementById('newUrlInput');
+
+                if (newUrlInput) {
+                    newUrlInput.addEventListener('keypress', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addNewUrl();
+                        }
+                    });
+                }
+            }
+
+            function addUrlFromDropdown() {
+                const dropdown = document.getElementById('urlDropdown');
+                const selectedUrl = dropdown.value;
+
+                if (selectedUrl && !selectedUrls.includes(selectedUrl)) {
+                    selectedUrls.push(selectedUrl);
+                    updateUrlDisplay();
+                    dropdown.value = '';
+                }
+            }
+
+            function addNewUrl() {
+                const input = document.getElementById('newUrlInput');
+                const newUrl = input.value.trim();
+
+                if (newUrl && isValidUrl(newUrl) && !selectedUrls.includes(newUrl)) {
+                    selectedUrls.push(newUrl);
+                    updateUrlDisplay();
+                    input.value = '';
+                } else if (newUrl && !isValidUrl(newUrl)) {
+                    alert('Please enter a valid URL (must start with http:// or https://)');
+                } else if (selectedUrls.includes(newUrl)) {
+                    alert('This URL has already been added');
+                }
+            }
+
+            function isValidUrl(string) {
+                try {
+                    new URL(string);
+                    return string.startsWith('http://') || string.startsWith('https://');
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            function updateUrlDisplay() {
+                const urlTags = document.getElementById('urlTags');
+                const selectedUrlsContainer = document.getElementById('selectedUrls');
+
+                if (selectedUrls.length > 0) {
+                    selectedUrlsContainer.classList.add('show');
+                    urlTags.innerHTML = selectedUrls.map((url, index) => `
+                    <div class="url-tag">
+                        <span>${getDomainFromUrl(url)}</span>
+                        <button class="remove-url" onclick="removeUrl(${index})" title="Remove URL">×</button>
+                    </div>
+                `).join('');
+                } else {
+                    selectedUrlsContainer.classList.remove('show');
+                }
+            }
+
+            function removeUrl(index) {
+                selectedUrls.splice(index, 1);
+                updateUrlDisplay();
+            }
+
+            function getDomainFromUrl(url) {
+                try {
+                    return new URL(url).hostname;
+                } catch (_) {
+                    return url;
+                }
+            }
+        </script>
+    </body>
+
+</html>

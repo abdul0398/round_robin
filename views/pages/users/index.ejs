@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('../../partials/head', { title: 'User Management - JJ Leads RR System' }) %>
+
+    <body>
+        <div class="container">
+            <%- include('../../partials/header') %>
+                <%- include('../../partials/navigation', { activeSection: 'users' }) %>
+
+                    <div class="section active">
+                        <h2>Participant Management</h2>
+
+                        <div style="margin:10px 0px 20px 0px;">
+                            <a href="/users/create" class="btn-primary">+ Add New Participant</a>
+                        </div>
+
+                        <div class="queue-list">
+                            <% if (users && users.length> 0) { %>
+                                <% users.forEach(user=> { %>
+                                    <div class="queue-item">
+                                        <div class="person-info">
+                                            <div class="person-avatar">
+                                                <%= user.name.split(' ').map(n => n[0]).join('') %></div>
+                                <div class="person-details">
+                                    <h4><%= user.name %></h4>
+                                    <p>Discord: <%= user.discord_name %></p>
+                                    <p>Status: <span class="status-badge <%= user.is_active ? ' active' : 'inactive' %>
+                                                    ">
+                                                    <%= user.is_active ? 'Active' : 'Inactive' %>
+                                                        </span></p>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <a href="/users/<%= user.id %>" class="btn-secondary">View</a>
+                                            <a href="/users/<%= user.id %>/edit" class="btn-secondary">Edit</a>
+                                            <button class="btn-danger"
+                                                onclick="deleteUser(<%= user.id %>)">Delete</button>
+                                        </div>
+                                    </div>
+                                    <% }) %>
+
+                                        <% if (pagination && pagination.pages> 1) { %>
+                                            <div style="text-align: center; margin-top: 20px;">
+                                                <% for (let i=1; i <=pagination.pages; i++) { %>
+                                                    <% if (i===pagination.page) { %>
+                                                        <span class="btn-primary" style="margin: 0 5px;">
+                                                            <%= i %>
+                                                        </span>
+                                                        <% } else { %>
+                                                            <a href="/users?page=<%= i %>" class="btn-secondary"
+                                                                style="margin: 0 5px;">
+                                                                <%= i %>
+                                                            </a>
+                                                            <% } %>
+                                                                <% } %>
+                                            </div>
+                                            <% } %>
+                                                <% } else { %>
+                                                    <div
+                                                        style="text-align: center; padding: 60px 20px; color: #6c757d;">
+                                                        <h3>No Participants Found</h3>
+                                                        <p>Add your first participant to get started!</p>
+                                                        <a href="/users/create" class="btn-primary"
+                                                            style="display: inline-block; margin-top: 15px;">Add
+                                                            Participant</a>
+                                                    </div>
+                                                    <% } %>
+                        </div>
+                    </div>
+        </div>
+
+        <style>
+            .status-badge {
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-size: 0.75rem;
+                font-weight: 500;
+            }
+
+            .status-badge.active {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+
+            .status-badge.inactive {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f1b0b7;
+            }
+        </style>
+
+        <script>
+            function deleteUser(userId) {
+                if (confirm('Are you sure you want to delete this participant?')) {
+                    fetch(`/users/${userId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert('✓ Participant deleted successfully!');
+                                location.reload();
+                            } else {
+                                alert('Failed to delete participant: ' + (data.error || 'Unknown error'));
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Failed to delete participant');
+                        });
+                }
+            }
+        </script>
+    </body>
+
+</html>

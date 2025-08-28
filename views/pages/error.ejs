@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('../partials/head', { title: 'Error - JJ Leads RR System' }) %>
+<body>
+    <div class="container">
+        <% if (isAuthenticated) { %>
+            <%- include('../partials/header') %>
+        <% } %>
+        
+        <div class="section active">
+            <div style="text-align: center; padding: 60px 20px;">
+                <div style="font-size: 6em; color: #002655; margin-bottom: 20px;">⚠️</div>
+                <h1 style="color: #002655; margin-bottom: 20px;">Oops! Something went wrong</h1>
+                <p style="color: #6c757d; font-size: 1.2em; margin-bottom: 30px;"><%= error %></p>
+                
+                <div>
+                    <% if (isAuthenticated) { %>
+                        <a href="/dashboard" class="btn-primary" style="margin-right: 10px;">Go to Dashboard</a>
+                    <% } %>
+                    <a href="/auth/login" class="btn-secondary">Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

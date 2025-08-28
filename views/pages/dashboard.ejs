@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('../partials/head', { title: 'Dashboard - JJ Leads RR System' }) %>
+<body>
+    <div class="container">
+        <%- include('../partials/header') %>
+        <%- include('../partials/navigation', { activeSection: 'dashboard' }) %>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="section active">
+            <h2>Dashboard Overview</h2>
+            
+            <div class="dashboard-stats">
+                <div class="stat-card">
+                    <h3><%= stats.activeRRs || 0 %></h3>
+                    <p>Active Round Robins</p>
+                </div>
+                <div class="stat-card">
+                    <h3><%= stats.totalLeads || 0 %></h3>
+                    <p>Total Leads Distributed</p>
+                </div>
+                <div class="stat-card">
+                    <h3><%= stats.totalParticipants || 0 %></h3>
+                    <p>Active Agents</p>
+                </div>
+                <div class="stat-card">
+                    <h3><%= stats.todayLeads || 0 %></h3>
+                    <p>Today's Leads</p>
+                </div>
+            </div>
+
+            <h3>Recent Round Robins</h3>
+            <div class="rr-grid">
+                <% if (roundRobins && roundRobins.length > 0) { %>
+                    <% roundRobins.forEach(rr => { %>
+                        <div class="rr-card" onclick="window.location.href='/round-robins/<%= rr.id %>'">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                                <h3 style="margin: 0;"><%= rr.name %></h3>
+                                <small style="color: rgba(255,255,255,0.8); font-size: 0.8em; text-align: right;">
+                                    <%= new Date(rr.created_at).toLocaleDateString() %>
+                                </small>
+                            </div>
+                            <p style="margin-bottom: 20px;"><%= rr.description || 'No description' %></p>
+                            <div class="rr-stats">
+                                <div class="stat">
+                                    <div class="stat-number"><%= rr.participant_count || 0 %></div>
+                                    <div class="stat-label">Agents</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="stat-number"><%= rr.total_leads || 0 %></div>
+                                    <div class="stat-label">Leads</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="stat-number"><%= rr.is_launched ? 'Live' : 'Draft' %></div>
+                                    <div class="stat-label">Status</div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <div style="text-align: center; padding: 40px; color: #6c757d;">
+                        <h3>No Round Robins Yet</h3>
+                        <p>Create your first round robin to get started!</p>
+                        <a href="/round-robins/create" class="btn-primary" style="display: inline-block; margin-top: 15px; text-decoration: none;">Create Round Robin</a>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('../../partials/head', { title: roundRobin.name + ' - JJ Leads RR System' }) %>
+<body>
+    <div class="container">
+        <%- include('../../partials/header') %>
+        
+        <div class="section active">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h2><%= roundRobin.name %>
+                        <span class="launch-status <%= roundRobin.is_launched ? 'launched' : 'draft' %>">
+                            <%= roundRobin.is_launched ? 'LIVE' : 'DRAFT' %>
+                        </span>
+                    </h2>
+                    <p style="color: #6c757d; margin: 10px 0;"><%= roundRobin.description || 'No description' %></p>
+                </div>
+                <div>
+                    <a href="/dashboard" class="btn-secondary">← Back to Dashboard</a>
+                </div>
+            </div>
+            
+            <% if (roundRobin.leadSources && roundRobin.leadSources.length > 0) { %>
+            <div style="margin: 15px 0;">
+                <h4 style="color: #002655; margin-bottom: 10px;">Lead Sources:</h4>
+                <div class="url-tags">
+                    <% roundRobin.leadSources.forEach(source => { %>
+                        <div class="url-tag" style="background: linear-gradient(135deg, #17a2b8, #6f42c1);">
+                            <span><%= source.domain %></span>
+                        </div>
+                    <% }) %>
+                </div>
+            </div>
+            <% } %>
+            
+            <% if (roundRobin.is_launched && roundRobin.participants && roundRobin.participants.length > 0) { %>
+            <div class="current-next">
+                <% 
+                const currentAgent = roundRobin.participants[roundRobin.current_position || 0];
+                const nextPosition = ((roundRobin.current_position || 0) + 1) % roundRobin.participants.length;
+                const nextAgent = roundRobin.participants[nextPosition];
+                %>
+                <div class="current-agent">
+                    <h3>Current Agent</h3>
+                    <h4><%= currentAgent.name %></h4>
+                    <p>Leads Received: <%= currentAgent.leads_received || 0 %></p>
+                </div>
+                <div class="next-agent">
+                    <h3>Next Agent</h3>
+                    <h4><%= nextAgent.name %></h4>
+                    <p>Leads Received: <%= nextAgent.leads_received || 0 %></p>
+                </div>
+            </div>
+            <% } %>
+            
+            <div class="dashboard-stats">
+                <div class="stat-card">
+                    <h3><%= roundRobin.total_leads || 0 %></h3>
+                    <p>Total Leads</p>
+                </div>
+                <div class="stat-card">
+                    <h3><%= roundRobin.participants ? roundRobin.participants.length : 0 %></h3>
+                    <p>Total Agents</p>
+                </div>
+                <div class="stat-card">
+                    <h3><%= roundRobin.is_launched ? 'Active' : 'Ready' %></h3>
+                    <p>Status</p>
+                </div>
+            </div>
+            
+            <h3>Queue Management <%= roundRobin.is_launched ? '(⚠️ Live RR - Drag to Reorder with Caution)' : '(Drag to Reorder)' %></h3>
+            <% if (roundRobin.is_launched) { %>
+                <div class="alert alert-warning" style="margin-bottom: 15px;">
+                    <strong>⚠️ Warning:</strong> This round robin is live. Reordering participants will affect the lead distribution sequence.
+                </div>
+            <% } %>
+            <div class="queue-list" id="queueList-<%= roundRobin.id %>">
+                <% if (roundRobin.participants && roundRobin.participants.length > 0) { %>
+                    <% roundRobin.participants.forEach((person, index) => { %>
+                        <div class="queue-item draggable" 
+                             data-person-id="<%= person.id %>" 
+                             data-index="<%= index %>"
+                             draggable="true">
+                            <div class="person-info">
+                                <div class="person-avatar"><%= person.name.split(' ').map(n => n[0]).join('') %></div>
+                                <div class="person-details">
+                                    <h4><%= person.name %></h4>
+                                    <p>Discord: <%= person.discord_name || 'Not set' %></p>
+                                    <div class="lead-stats">
+                                        <span class="stat-item">Limit: <%= person.lead_limit || 15 %></span>
+                                        <span class="stat-item current-leads">Current: <%= person.leads_received || 0 %></span>
+                                        <span class="stat-item available-leads">Available: <%= (person.lead_limit || 15) - (person.leads_received || 0) %></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="queue-position">
+                                Position <%= index + 1 %>
+                                <%= roundRobin.is_launched && index === (roundRobin.current_position || 0) ? ' (Current)' : '' %>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <p style="text-align: center; color: #6c757d; padding: 20px;">No participants added yet.</p>
+                <% } %>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <% if (roundRobin.is_launched) { %>
+                    <button class="btn-primary" onclick="simulateLead(<%= roundRobin.id %>)">Simulate Lead</button>
+                    <button class="btn-secondary" onclick="showWebhookInfo(<%= roundRobin.id %>)">Webhook Info</button>
+                <% } else { %>
+                    <button class="btn-primary" onclick="launchRR(<%= roundRobin.id %>)">Launch RR</button>
+                <% } %>
+                <button class="btn-secondary" onclick="editRR(<%= roundRobin.id %>)">Edit Details</button>
+                <button class="btn-danger" onclick="deleteRR(<%= roundRobin.id %>)">Delete RR</button>
+            </div>
+            
+            <% if (roundRobin.is_launched && roundRobin.leads && roundRobin.leads.length > 0) { %>
+            <div style="margin-top: 30px;">
+                <h3 style="color: #002655; margin-bottom: 15px;">Received Leads History</h3>
+                <div class="leads-table-container">
+                    <table class="leads-table">
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Lead Info</th>
+                                <th>Assigned To</th>
+                                <th>Source</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% roundRobin.leads.forEach(lead => { %>
+                                <tr class="lead-row">
+                                    <td class="lead-date"><%= new Date(lead.received_at).toLocaleDateString() + ' ' + new Date(lead.received_at).toLocaleTimeString() %></td>
+                                    <td class="lead-info">
+                                        <strong><%= lead.name || 'Unknown' %></strong><br>
+                                        <small><%= (lead.phone || '') + ' | ' + (lead.email || '') %></small>
+                                    </td>
+                                    <td class="lead-agent">
+                                        <div class="agent-tag">
+                                            <span class="agent-avatar"><%= lead.participant_name.split(' ').map(n => n[0]).join('') %></span>
+                                            <%= lead.participant_name %>
+                                        </div>
+                                    </td>
+                                    <td class="lead-source">
+                                        <span class="source-tag"><%= lead.source_domain || 'Unknown' %></span>
+                                    </td>
+                                    <td class="lead-status">
+                                        <span class="status-badge <%= lead.status %>" 
+                                              <%= (lead.status === 'junk' || lead.status === 'spam') && lead.status_reason ? `title="Reason: ${lead.status_reason}"` : '' %>>
+                                            <%- (() => {
+                                                const statusMap = {
+                                                    'sent': 'Sent to Discord',
+                                                    'junk': 'Marked as Junk',
+                                                    'spam': 'Marked as Spam',
+                                                    'pending': 'Pending'
+                                                };
+                                                return statusMap[lead.status] || lead.status;
+                                            })() %>
+                                        </span>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <% } %>
+        </div>
+    </div>
+
+    <script>
+        function launchRR(rrId) {
+            if (confirm('Are you sure you want to launch this Round Robin? You won\'t be able to edit the queue after launching.')) {
+                fetch(`/round-robins/${rrId}/launch`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('✓ Round Robin launched successfully!');
+                        location.reload();
+                    } else {
+                        alert('Failed to launch round robin: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to launch round robin');
+                });
+            }
+        }
+
+        function simulateLead(rrId) {
+            fetch(`/round-robins/${rrId}/simulate-lead`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`✓ Lead assigned to ${data.assignedTo}!`);
+                    location.reload();
+                } else {
+                    alert('Failed to simulate lead: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to simulate lead');
+            });
+        }
+
+        function editRR(rrId) {
+            window.location.href = `/round-robins/${rrId}/edit`;
+        }
+
+        function showWebhookInfo(rrId) {
+            fetch(`/api/webhook/info/${rrId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                        return;
+                    }
+                    
+                    // Create a nicely formatted webhook info display
+                    const webhookInfo = `
+📡 WEBHOOK INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 Webhook URL:
+${data.webhook.url}
+
+🔐 Authentication:
+Type: ${data.webhook.authentication.type}
+Header: ${data.webhook.authentication.header}
+Format: ${data.webhook.authentication.format}
+Token: ${data.webhook.authentication.token}
+
+📋 Required Fields:
+${data.webhook.payload.required_fields.join(', ')}
+
+📝 Example Request:
+POST ${data.webhook.url}
+Authorization: Bearer ${data.webhook.authentication.token}
+Content-Type: application/json
+
+${JSON.stringify(data.webhook.payload.example, null, 2)}
+
+✅ Success Response (200):
+${JSON.stringify(data.webhook.responses.success.body, null, 2)}
+
+❌ Error Responses:
+${Object.entries(data.webhook.responses.errors).map(([code, msg]) => `${code}: ${msg}`).join('\n')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    `;
+                    
+                    // Show in a modal-like alert (you could enhance this with a proper modal)
+                    alert(webhookInfo);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to fetch webhook information');
+                });
+        }
+
+        function deleteRR(rrId) {
+            if (confirm('Are you sure you want to delete this Round Robin? This action cannot be undone.')) {
+                fetch(`/round-robins/${rrId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('✓ Round Robin deleted successfully!');
+                        window.location.href = '/dashboard';
+                    } else {
+                        alert('Failed to delete round robin: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to delete round robin');
+                });
+            }
+        }
+
+        // Initialize drag and drop functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDragAndDrop();
+        });
+
+        function initializeDragAndDrop() {
+            const queueList = document.querySelector('.queue-list');
+            if (!queueList) return;
+
+            let draggedElement = null;
+            let draggedIndex = null;
+
+            // Add event listeners to all draggable items
+            const items = queueList.querySelectorAll('.draggable');
+            items.forEach((item, index) => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('drop', handleDrop);
+                item.addEventListener('dragend', handleDragEnd);
+            });
+
+            function handleDragStart(e) {
+                draggedElement = this;
+                draggedIndex = parseInt(this.dataset.index);
+                this.style.opacity = '0.5';
+                
+                // Set drag data
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', this.outerHTML);
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                
+                // Add visual feedback
+                this.classList.add('drag-over');
+                return false;
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+                
+                if (draggedElement !== this) {
+                    const targetIndex = parseInt(this.dataset.index);
+                    
+                    // Confirm reorder if round robin is launched
+                    <% if (roundRobin.is_launched) { %>
+                    if (!confirm('⚠️ Warning: This round robin is live.\n\nReordering participants will change the lead distribution sequence.\n\nAre you sure you want to continue?')) {
+                        return false;
+                    }
+                    <% } %>
+                    
+                    // Perform the reorder
+                    reorderParticipants(draggedIndex, targetIndex);
+                }
+                
+                return false;
+            }
+
+            function handleDragEnd(e) {
+                this.style.opacity = '';
+                
+                // Remove drag feedback from all items
+                items.forEach(item => {
+                    item.classList.remove('drag-over');
+                });
+            }
+        }
+
+        function reorderParticipants(fromIndex, toIndex) {
+            const queueList = document.querySelector('.queue-list');
+            const items = Array.from(queueList.querySelectorAll('.draggable'));
+            
+            // Create new order array
+            const participantIds = items.map(item => parseInt(item.dataset.personId));
+            
+            // Move the item in the array
+            const movedItem = participantIds.splice(fromIndex, 1)[0];
+            participantIds.splice(toIndex, 0, movedItem);
+            
+            // Send update to server
+            fetch(`/api/round-robins/<%= roundRobin.id %>/reorder-participants`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    participantIds: participantIds
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload the page to show updated order
+                    location.reload();
+                } else {
+                    alert('Failed to reorder participants: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to reorder participants');
+            });
+        }
+
+        // Helper function for status display
+        function getStatusDisplay(status) {
+            const statusMap = {
+                'sent': 'Sent to Discord',
+                'junk': 'Marked as Junk',
+                'spam': 'Marked as Spam',
+                'pending': 'Pending'
+            };
+            return statusMap[status] || status;
+        }
+    </script>
+</body>
+</html>
