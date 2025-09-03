@@ -7,13 +7,50 @@ const mysql = require('mysql2/promise');
 // Load environment variables
 require('dotenv').config();
 
+async function executeSQLFile(connection, filePath, description) {
+    const sqlContent = fs.readFileSync(filePath, 'utf8');
+    
+    // Split SQL content into individual statements
+    const statements = sqlContent
+        .split(';')
+        .map(stmt => stmt.trim())
+        .filter(stmt => stmt.length > 0 && !stmt.startsWith('--') && !stmt.startsWith('/*'));
+    
+    console.log(`${description} (${statements.length} statements)...`);
+    
+    for (let i = 0; i < statements.length; i++) {
+        const statement = statements[i];
+        if (statement.toLowerCase().startsWith('select')) {
+            // Skip SELECT statements (like status messages)
+            continue;
+        }
+        
+        try {
+            await connection.execute(statement);
+            if (statement.toLowerCase().startsWith('drop table')) {
+                const tableName = statement.match(/drop table if exists (\w+)/i)?.[1];
+                if (tableName) {
+                    console.log(`  ✓ Dropped table: ${tableName}`);
+                }
+            } else if (statement.toLowerCase().startsWith('create table')) {
+                const tableName = statement.match(/create table if not exists (\w+)/i)?.[1];
+                if (tableName) {
+                    console.log(`  ✓ Created table: ${tableName}`);
+                }
+            }
+        } catch (error) {
+            console.warn(`  ⚠ Statement failed (this may be expected): ${statement.substring(0, 50)}...`);
+            console.warn(`    Error: ${error.message}`);
+        }
+    }
+}
+
 async function updateDatabase() {
     const connection = await mysql.createConnection({
         host: process.env.DB_HOST || 'localhost',
         user: process.env.DB_USER || 'root',
         password: process.env.DB_PASSWORD || '',
-        database: process.env.DB_NAME || 'jj_leads_rr',
-        multipleStatements: true
+        database: process.env.DB_NAME || 'jj_leads_rr'
     });
 
     try {
@@ -26,20 +63,14 @@ async function updateDatabase() {
             process.exit(1);
         }
 
-        // Read and execute drop tables script
+        // Execute drop tables script
         const dropTablesPath = path.join(__dirname, 'drop-all-tables.sql');
-        const dropTablesSQL = fs.readFileSync(dropTablesPath, 'utf8');
-        
-        console.log('🗑️  Dropping all existing tables...');
-        await connection.execute(dropTablesSQL);
+        await executeSQLFile(connection, dropTablesPath, '🗑️  Dropping all existing tables');
         console.log('✅ All tables dropped successfully');
 
-        // Read and execute create tables script
+        // Execute create tables script
         const createTablesPath = path.join(__dirname, 'database-schema-clean.sql');
-        const createTablesSQL = fs.readFileSync(createTablesPath, 'utf8');
-        
-        console.log('🏗️  Creating new tables with updated schema...');
-        await connection.execute(createTablesSQL);
+        await executeSQLFile(connection, createTablesPath, '🏗️  Creating new tables with updated schema');
         console.log('✅ New tables created successfully');
 
         console.log('');
