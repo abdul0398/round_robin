@@ -166,6 +166,14 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
     PRIMARY KEY (session_id)
 ) ENGINE = InnoDB;
 
+-- Also create the default sessions table as fallback for express-mysql-session
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+    expires INT(11) UNSIGNED NOT NULL,
+    data MEDIUMTEXT COLLATE utf8mb4_bin,
+    PRIMARY KEY (session_id)
+) ENGINE = InnoDB;
+
 CREATE TABLE IF NOT EXISTS master_urls (
     id INT PRIMARY KEY AUTO_INCREMENT,
     url VARCHAR(500) NOT NULL UNIQUE,
