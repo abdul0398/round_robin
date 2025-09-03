@@ -7,20 +7,29 @@ const methodOverride = require('method-override');
 require('dotenv').config();
 
 const { pool, testConnection } = require('./config/database');
-const { loadUser } = require('./middleware/auth');
+const { loadAdminSession } = require('./middleware/adminAuth');
 
 // Import routes
-const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
 const dashboardRoutes = require('./routes/dashboard');
 const roundRobinRoutes = require('./routes/roundRobins');
-const userRoutes = require('./routes/users');
+const participantsRoutes = require('./routes/participants');
 const apiRoutes = require('./routes/api');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Session store configuration
-const sessionStore = new MySQLStore({}, pool);
+// Session store configuration - use admin_sessions table
+const sessionStore = new MySQLStore({
+    schema: {
+        tableName: 'admin_sessions',
+        columnNames: {
+            session_id: 'session_id',
+            expires: 'expires',
+            data: 'data'
+        }
+    }
+}, pool);
 
 // Middleware setup
 app.use(bodyParser.json());
@@ -48,22 +57,22 @@ app.set('views', path.join(__dirname, 'views'));
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Load user middleware (makes user available in all views)
-app.use(loadUser);
+// Load admin session middleware
+app.use(loadAdminSession);
 
 // Routes
-app.use('/auth', authRoutes);
+app.use('/admin', adminRoutes);
 app.use('/', dashboardRoutes);
 app.use('/round-robins', roundRobinRoutes);
-app.use('/users', userRoutes);
+app.use('/participants', participantsRoutes);
 app.use('/api', apiRoutes);
 
 // Root redirect
 app.get('/', (req, res) => {
-    if (req.session && req.session.userId) {
+    if (req.session && req.session.isAdminAuthenticated) {
         res.redirect('/dashboard');
     } else {
-        res.redirect('/auth/login');
+        res.redirect('/admin/login');
     }
 });
 
@@ -71,16 +80,14 @@ app.get('/', (req, res) => {
 app.use((err, req, res, next) => {
     console.error('Error:', err);
     res.status(500).render('pages/error', { 
-        error: 'Something went wrong. Please try again.',
-        currentUser: res.locals.currentUser 
+        error: 'Something went wrong. Please try again.' 
     });
 });
 
 // 404 handler
 app.use((req, res) => {
     res.status(404).render('pages/error', { 
-        error: 'Page not found',
-        currentUser: res.locals.currentUser 
+        error: 'Page not found'
     });
 });
 
@@ -98,7 +105,8 @@ async function startServer() {
             console.log(`✓ Server running on http://localhost:${PORT}`);
             console.log('✓ Database connected successfully');
             console.log('\n📝 To set up the database, run: npm run create-tables');
-            console.log('🔐 Default login: admin@jjleads.com / admin123');
+            console.log('🔐 Admin login: /admin/login');
+            console.log('👤 Default credentials: admin / admin123');
         });
     } catch (error) {
         console.error('Failed to start server:', error);

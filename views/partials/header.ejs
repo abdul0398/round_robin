@@ -5,8 +5,10 @@
             <p>Round Robin Distribution System</p>
         </div>
         <div class="user-info">
-            <span>Welcome, <%= currentUser.name %></span>
-            <a href="/auth/logout" class="btn-secondary" style="margin-left: 15px;">Logout</a>
+            <span>Admin Panel</span>
+            <form method="POST" action="/admin/logout" style="display: inline; margin-left: 15px;">
+                <button type="submit" class="btn-secondary" style="border: none; background: none; color: inherit; cursor: pointer;">Logout</button>
+            </form>
         </div>
     </div>
 </div>

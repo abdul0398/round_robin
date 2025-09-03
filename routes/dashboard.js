@@ -1,15 +1,13 @@
 const express = require('express');
 const RoundRobin = require('../models/RoundRobin');
 const RoundRobinSimple = require('../models/RoundRobinSimple');
-const { requireAuth } = require('../middleware/auth');
+const { requireAdminAuth } = require('../middleware/adminAuth');
 
 const router = express.Router();
 
 // Dashboard page
-router.get('/dashboard', requireAuth, async (req, res) => {
+router.get('/dashboard', requireAdminAuth, async (req, res) => {
     try {
-        const userId = null; // Single admin sees all data
-        
         // Get dashboard statistics with fallback
         let stats = {
             totalRRs: 0,
@@ -20,7 +18,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         };
         
         try {
-            stats = await RoundRobinSimple.getDashboardStatsSimple(userId);
+            stats = await RoundRobin.getDashboardStats();
         } catch (statsError) {
             console.error('Dashboard stats error:', statsError);
         }
@@ -28,8 +26,8 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         // Get recent round robins with fallback
         let roundRobins = [];
         try {
-            const result = await RoundRobinSimple.findAllSimple(userId);
-            roundRobins = result.roundRobins.slice(0, 6) || [];
+            const result = await RoundRobin.findAll(1, 6);
+            roundRobins = result.roundRobins || [];
         } catch (rrError) {
             console.error('Dashboard round robins error:', rrError);
         }

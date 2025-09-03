@@ -9,7 +9,9 @@
     "create-tables": "node scripts/create-tables.js",
     "setup": "node scripts/setup-production.js",
     "check": "node scripts/check-production.js",
-    "setup-prod": "NODE_ENV=production node scripts/setup-production.js"
+    "setup-prod": "NODE_ENV=production node scripts/setup-production.js",
+    "update-db": "node scripts/update-database.js",
+    "update-db-force": "node scripts/update-database.js --force"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

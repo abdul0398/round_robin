@@ -1,28 +1,26 @@
 const { pool } = require("../config/database");
 const LeadLogger = require("../utils/LeadLogger");
 const Participant = require("./Participant");
+const crypto = require("crypto");
 
 class RoundRobin {
   // Create a new round robin
   static async create(rrData) {
-    const {
-      name,
-      description,
-      createdBy,
-      participants = [],
-      leadSources = [],
-    } = rrData;
+    const { name, description, participants = [], leadSources = [] } = rrData;
 
     const connection = await pool.getConnection();
 
     try {
       await connection.beginTransaction();
 
+      // Generate webhook secret
+      const webhookSecret = crypto.randomBytes(32).toString("hex");
+
       // Insert round robin
       const [rrResult] = await connection.execute(
-        `INSERT INTO round_robins (name, description, created_by) 
+        `INSERT INTO round_robins (name, description, webhook_secret) 
                  VALUES (?, ?, ?)`,
-        [name, description || null, createdBy]
+        [name, description || null, webhookSecret]
       );
 
       const roundRobinId = rrResult.insertId;
@@ -31,27 +29,26 @@ class RoundRobin {
       if (participants.length > 0) {
         for (let i = 0; i < participants.length; i++) {
           const participant = participants[i];
-          let participantId = participant.userId;
-          
+          let participantId = participant.participantId;
+
           // If this is a new participant (isExternal = true), create it in the global participants table first
-          if (participant.isExternal && !participant.userId) {
+          if (participant.isExternal && !participant.participantId) {
             participantId = await Participant.create({
               name: participant.name,
               discordName: participant.discordName,
-              discordWebhook: participant.discordWebhook
+              discordWebhook: participant.discordWebhook,
             });
           }
-          
+
           // Now create the round robin participant association
           await connection.execute(
             `INSERT INTO rr_participants 
-                         (round_robin_id, participant_id, user_id, name, discord_name, discord_webhook, 
+                         (round_robin_id, participant_id, name, discord_name, discord_webhook, 
                           lead_limit, queue_position, is_external) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               roundRobinId,
               participantId,
-              participant.userId || null,
               participant.name,
               participant.discordName || null,
               participant.discordWebhook || null,
@@ -86,40 +83,27 @@ class RoundRobin {
   }
 
   // Get all round robins with stats
-  static async findAll(userId = null, page = 1, limit = 10) {
+  static async findAll(page = 1, limit = 10) {
     try {
       const pageInt = parseInt(page) || 1;
       const limitInt = parseInt(limit) || 10;
       const offsetInt = (pageInt - 1) * limitInt;
 
-      let whereClause = "";
-      let params = [];
-
-      if (userId) {
-        whereClause = "WHERE rr.created_by = ?";
-        params.push(parseInt(userId));
-      }
-
       const [rows] = await pool.execute(
         `SELECT rr.*, 
-                        u.name as created_by_name,
                         COUNT(DISTINCT p.id) as participant_count,
                         COUNT(DISTINCT s.id) as source_count,
                         COALESCE(rr.current_position, 0) as current_position
                  FROM round_robins rr
-                 LEFT JOIN users u ON rr.created_by = u.id
-                 LEFT JOIN rr_participants p ON rr.id = p.round_robin_id
-                 LEFT JOIN lead_sources s ON rr.id = s.round_robin_id
-                 ${whereClause}
+                 LEFT JOIN rr_participants p ON rr.id = p.round_robin_id AND p.is_active = TRUE
+                 LEFT JOIN lead_sources s ON rr.id = s.round_robin_id AND s.is_active = TRUE
                  GROUP BY rr.id
                  ORDER BY rr.created_at DESC
-                 LIMIT ${limitInt} OFFSET ${offsetInt}`,
-        params
+                 LIMIT ${limitInt} OFFSET ${offsetInt}`
       );
 
       const [countRows] = await pool.execute(
-        `SELECT COUNT(DISTINCT rr.id) as total FROM round_robins rr ${whereClause}`,
-        userId ? [parseInt(userId)] : []
+        `SELECT COUNT(DISTINCT rr.id) as total FROM round_robins rr`
       );
 
       return {
@@ -138,10 +122,7 @@ class RoundRobin {
     try {
       // Get round robin basic info
       const [rrRows] = await pool.execute(
-        `SELECT rr.*, u.name as created_by_name 
-                 FROM round_robins rr
-                 LEFT JOIN users u ON rr.created_by = u.id
-                 WHERE rr.id = ?`,
+        `SELECT rr.* FROM round_robins rr WHERE rr.id = ?`,
         [id]
       );
 
@@ -152,7 +133,7 @@ class RoundRobin {
       // Get participants
       const [participants] = await pool.execute(
         `SELECT * FROM rr_participants 
-                 WHERE round_robin_id = ? 
+                 WHERE round_robin_id = ? AND is_active = TRUE
                  ORDER BY queue_position`,
         [id]
       );
@@ -183,6 +164,295 @@ class RoundRobin {
     } catch (error) {
       throw error;
     }
+  }
+
+  // Get leads for a round robin with pagination
+  static async getLeads(roundRobinId, page = 1, limit = 20) {
+    try {
+      const pageInt = parseInt(page) || 1;
+      const limitInt = parseInt(limit) || 20;
+      const offsetInt = (pageInt - 1) * limitInt;
+
+      // Get leads with participant information and additional data
+      const [leads] = await pool.execute(
+        `SELECT l.*, 
+                p.name as participant_name,
+                p.discord_name as participant_discord,
+                COUNT(lad.id) as additional_fields_count
+         FROM leads l
+         JOIN rr_participants p ON l.participant_id = p.id
+         LEFT JOIN lead_additional_data lad ON l.id = lad.lead_id
+         WHERE l.round_robin_id = ?
+         GROUP BY l.id
+         ORDER BY l.received_at DESC
+         LIMIT ${limitInt} OFFSET ${offsetInt}`,
+        [roundRobinId]
+      );
+
+      // Get total count for pagination
+      const [countRows] = await pool.execute(
+        `SELECT COUNT(*) as total FROM leads WHERE round_robin_id = ?`,
+        [roundRobinId]
+      );
+
+      // Get additional data for each lead
+      for (const lead of leads) {
+        const [additionalData] = await pool.execute(
+          `SELECT field_key, field_value FROM lead_additional_data 
+           WHERE lead_id = ? ORDER BY id`,
+          [lead.id]
+        );
+        lead.additional_data = additionalData;
+      }
+
+      return {
+        leads,
+        total: countRows[0].total,
+        page: pageInt,
+        pages: Math.ceil(countRows[0].total / limitInt),
+        limit: limitInt
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Mark a lead as junk and add email/phone to junk list
+  static async markLeadAsJunk(leadId, reason = 'Marked as junk') {
+    const connection = await pool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      // Get the lead details first
+      const [leadRows] = await connection.execute(
+        'SELECT * FROM leads WHERE id = ?',
+        [leadId]
+      );
+      
+      if (leadRows.length === 0) {
+        return { success: false, error: 'Lead not found' };
+      }
+      
+      const lead = leadRows[0];
+      
+      // Update lead status to junk
+      await connection.execute(
+        'UPDATE leads SET status = ?, status_reason = ? WHERE id = ?',
+        ['junk', reason, leadId]
+      );
+      
+      // Create junk rules for email and phone to prevent future leads
+      const junkRulesCreated = [];
+      
+      // Add email to junk list if exists
+      if (lead.email && lead.email.trim()) {
+        try {
+          await connection.execute(
+            `INSERT INTO junk_list (type, value, reason, created_by, created_at) 
+             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            ['email', lead.email.trim().toLowerCase(), reason, 'admin']
+          );
+          junkRulesCreated.push(`email: ${lead.email}`);
+        } catch (error) {
+          // Ignore duplicate entry errors
+          if (error.code !== 'ER_DUP_ENTRY') {
+            throw error;
+          }
+        }
+      }
+      
+      // Add phone to junk list if exists
+      if (lead.phone && lead.phone.trim()) {
+        try {
+          await connection.execute(
+            `INSERT INTO junk_list (type, value, reason, created_by, created_at) 
+             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            ['phone', lead.phone.trim(), reason, 'admin']
+          );
+          junkRulesCreated.push(`phone: ${lead.phone}`);
+        } catch (error) {
+          // Ignore duplicate entry errors
+          if (error.code !== 'ER_DUP_ENTRY') {
+            throw error;
+          }
+        }
+      }
+      
+      await connection.commit();
+      
+      // Log the junk marking (outside transaction to avoid lock timeout)
+      try {
+        const LeadLogger = require('../utils/LeadLogger');
+        await LeadLogger.log({
+          leadId: leadId,
+          roundRobinId: lead.round_robin_id,
+          participantId: lead.participant_id,
+          eventType: 'lead_marked_junk',
+          status: 'success',
+          message: `Lead marked as junk: ${reason}`,
+          details: { 
+            reason: reason,
+            junkRulesCreated: junkRulesCreated,
+            email: lead.email,
+            phone: lead.phone
+          }
+        });
+      } catch (logError) {
+        console.error('Failed to log junk marking:', logError);
+        // Don't fail the operation if logging fails
+      }
+      
+      return { 
+        success: true, 
+        junkRulesCreated: junkRulesCreated 
+      };
+      
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // Check if a lead should be marked as junk based on email/phone
+  static async checkIfJunk(email, phone) {
+    try {
+      const conditions = [];
+      const params = [];
+      
+      if (email && email.trim()) {
+        conditions.push('(type = ? AND value = ?)');
+        params.push('email', email.trim().toLowerCase());
+      }
+      
+      if (phone && phone.trim()) {
+        conditions.push('(type = ? AND value = ?)');
+        params.push('phone', phone.trim());
+      }
+      
+      if (conditions.length === 0) {
+        return { isJunk: false };
+      }
+      
+      const [rows] = await pool.execute(
+        `SELECT * FROM junk_list WHERE ${conditions.join(' OR ')} AND is_active = TRUE LIMIT 1`,
+        params
+      );
+      
+      if (rows.length > 0) {
+        return { 
+          isJunk: true, 
+          reason: `Automatically marked as junk - ${rows[0].type}: ${rows[0].value}`,
+          junkRule: rows[0]
+        };
+      }
+      
+      return { isJunk: false };
+      
+    } catch (error) {
+      // If junk_list table doesn't exist yet, return false
+      if (error.code === 'ER_NO_SUCH_TABLE') {
+        return { isJunk: false };
+      }
+      throw error;
+    }
+  }
+
+  // Pause/Unpause a participant in a round robin
+  static async toggleParticipantPause(roundRobinId, participantId, isPaused, reason = '') {
+    const connection = await pool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      // Check if participant exists in the round robin
+      const [participantRows] = await connection.execute(
+        'SELECT * FROM rr_participants WHERE round_robin_id = ? AND id = ?',
+        [roundRobinId, participantId]
+      );
+      
+      if (participantRows.length === 0) {
+        return { success: false, error: 'Participant not found in this round robin' };
+      }
+      
+      const participant = participantRows[0];
+      
+      // Update participant pause status
+      await connection.execute(
+        'UPDATE rr_participants SET is_paused = ? WHERE id = ?',
+        [isPaused, participantId]
+      );
+      
+      await connection.commit();
+      
+      // Log the pause/unpause action
+      try {
+        const LeadLogger = require('../utils/LeadLogger');
+        await LeadLogger.log({
+          leadId: null,
+          roundRobinId: roundRobinId,
+          participantId: participantId,
+          eventType: isPaused ? 'participant_paused' : 'participant_unpaused',
+          status: 'success',
+          message: `Participant ${isPaused ? 'paused' : 'unpaused'}: ${participant.name}`,
+          details: { 
+            reason: reason,
+            participantName: participant.name,
+            action: isPaused ? 'pause' : 'unpause'
+          }
+        });
+      } catch (logError) {
+        console.error('Failed to log participant pause/unpause:', logError);
+      }
+      
+      return { 
+        success: true, 
+        message: `Participant ${isPaused ? 'paused' : 'unpaused'} successfully`,
+        participant: {
+          id: participant.id,
+          name: participant.name,
+          is_paused: isPaused
+        }
+      };
+      
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // Get next available (non-paused) participant for lead distribution
+  static getNextAvailableParticipant(participants, currentPosition) {
+    if (participants.length === 0) {
+      return null;
+    }
+    
+    // Start from current position and look for next available participant
+    let attempts = 0;
+    let position = currentPosition;
+    
+    while (attempts < participants.length) {
+      const participant = participants[position];
+      
+      // Check if participant is active and not paused
+      if (participant.is_active && !participant.is_paused) {
+        return {
+          participant: participant,
+          position: position
+        };
+      }
+      
+      // Move to next participant
+      position = (position + 1) % participants.length;
+      attempts++;
+    }
+    
+    // If all participants are paused, return null
+    return null;
   }
 
   // Launch round robin
@@ -230,14 +500,31 @@ class RoundRobin {
         throw new Error("No participants found in round robin");
       }
 
-      // Get current participant
-      const currentParticipant = participants[rr.current_position];
+      // Check if this lead should be marked as junk
+      const junkCheck = await this.checkIfJunk(leadData.email, leadData.phone);
+      let leadStatus = leadData.status || "sent";
+      let statusReason = null;
+      
+      if (junkCheck.isJunk) {
+        leadStatus = "junk";
+        statusReason = junkCheck.reason;
+      }
+
+      // Get next available (non-paused) participant
+      const availableResult = this.getNextAvailableParticipant(participants, rr.current_position);
+      
+      if (!availableResult) {
+        throw new Error("No available participants (all may be paused)");
+      }
+      
+      const currentParticipant = availableResult.participant;
+      const actualPosition = availableResult.position;
 
       // Insert the lead
       const [leadResult] = await connection.execute(
         `INSERT INTO leads 
-                 (round_robin_id, participant_id, name, phone, email, source_url, source_domain, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                 (round_robin_id, participant_id, name, phone, email, source_url, source_domain, status, status_reason) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           roundRobinId,
           currentParticipant.id,
@@ -246,7 +533,8 @@ class RoundRobin {
           leadData.email || null,
           leadData.sourceUrl || null,
           this.extractDomain(leadData.sourceUrl || ""),
-          leadData.status || "sent",
+          leadStatus,
+          statusReason
         ]
       );
 
@@ -257,7 +545,8 @@ class RoundRobin {
       );
 
       // Update round robin position and total leads
-      const nextPosition = (rr.current_position + 1) % participants.length;
+      // Move to next position from where we actually assigned the lead
+      const nextPosition = (actualPosition + 1) % participants.length;
       await connection.execute(
         `UPDATE round_robins 
                  SET current_position = ?, total_leads = total_leads + 1, updated_at = CURRENT_TIMESTAMP 
@@ -268,26 +557,55 @@ class RoundRobin {
       await connection.commit();
 
       const leadId = leadResult.insertId;
-      
+
       // Log lead assignment
-      await LeadLogger.logLeadAssigned(leadId, roundRobinId, currentParticipant.id, currentParticipant.name);
+      await LeadLogger.logLeadAssigned(
+        leadId,
+        roundRobinId,
+        currentParticipant.id,
+        currentParticipant.name
+      );
 
       // Send to Discord webhook (don't fail the lead distribution if Discord fails)
+      // Skip Discord notification for junk leads
       let discordResult = null;
-      try {
-        discordResult = await this.sendToDiscord(
-          currentParticipant,
-          leadData,
-          [],
-          leadId,
-          roundRobinId
-        );
-      } catch (discordError) {
-        await LeadLogger.logError(leadId, roundRobinId, currentParticipant.id, discordError, {
-          context: 'discord_notification',
-          leadData: { name: leadData.name, email: leadData.email }
+      if (leadStatus === "junk") {
+        await LeadLogger.log({
+          leadId: leadId,
+          roundRobinId: roundRobinId,
+          participantId: currentParticipant.id,
+          eventType: 'lead_marked_junk',
+          status: 'info',
+          message: `Lead automatically marked as junk - Discord notification skipped`,
+          details: { 
+            reason: statusReason,
+            email: leadData.email,
+            phone: leadData.phone
+          }
         });
-        discordResult = { success: false, reason: discordError.message };
+        discordResult = { success: false, reason: "Lead marked as junk - Discord notification skipped" };
+      } else {
+        try {
+          discordResult = await this.sendToDiscord(
+            currentParticipant,
+            leadData,
+            [],
+            leadId,
+            roundRobinId
+          );
+        } catch (discordError) {
+          await LeadLogger.logError(
+            leadId,
+            roundRobinId,
+            currentParticipant.id,
+            discordError,
+            {
+              context: "discord_notification",
+              leadData: { name: leadData.name, email: leadData.email },
+            }
+          );
+          discordResult = { success: false, reason: discordError.message };
+        }
       }
 
       return {
@@ -343,40 +661,77 @@ class RoundRobin {
         [name, description || null, id]
       );
 
-      // Delete existing participants and lead sources
-      await connection.execute(
-        "DELETE FROM rr_participants WHERE round_robin_id = ?",
-        [id]
-      );
-      await connection.execute(
-        "DELETE FROM lead_sources WHERE round_robin_id = ?",
+      // Smart participant update - preserve existing participants with leads
+
+      // Get current participants in the round robin
+      const [currentParticipants] = await connection.execute(
+        "SELECT id, participant_id, name, discord_name FROM rr_participants WHERE round_robin_id = ?",
         [id]
       );
 
-      // Insert updated participants
-      if (participants.length > 0) {
-        for (let i = 0; i < participants.length; i++) {
-          const participant = participants[i];
-          let participantId = participant.userId;
-          
-          // If this is a new participant (isExternal = true), create it in the global participants table first
-          if (participant.isExternal && !participant.userId) {
-            participantId = await Participant.create({
-              name: participant.name,
-              discordName: participant.discordName,
-              discordWebhook: participant.discordWebhook
-            });
-          }
-          
+      // Build a map of existing participants for quick lookup
+      const existingParticipantMap = new Map();
+      currentParticipants.forEach((p) => {
+        const key = p.participant_id
+          ? `participant_${p.participant_id}`
+          : `external_${p.name}_${p.discord_name}`;
+        existingParticipantMap.set(key, p);
+      });
+
+      // Track which participants should remain
+      const participantsToKeep = new Set();
+
+      // Process each participant in the update
+      for (let i = 0; i < participants.length; i++) {
+        const participant = participants[i];
+        let participantId = participant.participantId;
+
+        // If this is a new external participant, create it in the global participants table first
+        if (participant.isExternal && !participant.participantId) {
+          participantId = await Participant.create({
+            name: participant.name,
+            discordName: participant.discordName,
+            discordWebhook: participant.discordWebhook,
+          });
+        }
+
+        // Create key for this participant (after potential creation)
+        const participantKey = participantId
+          ? `participant_${participantId}`
+          : `external_${participant.name}_${participant.discordName}`;
+
+        if (existingParticipantMap.has(participantKey)) {
+          // Update existing participant
+          const existingParticipant =
+            existingParticipantMap.get(participantKey);
+          participantsToKeep.add(existingParticipant.id);
+
+          await connection.execute(
+            `UPDATE rr_participants 
+             SET participant_id = ?, name = ?, discord_name = ?, discord_webhook = ?, 
+                 lead_limit = ?, queue_position = ?, is_external = ?
+             WHERE id = ?`,
+            [
+              participantId,
+              participant.name,
+              participant.discordName || null,
+              participant.discordWebhook || null,
+              participant.leadLimit || 15,
+              i,
+              participant.isExternal || false,
+              existingParticipant.id,
+            ]
+          );
+        } else {
+          // Insert new participant
           await connection.execute(
             `INSERT INTO rr_participants 
-                         (round_robin_id, participant_id, user_id, name, discord_name, discord_webhook, 
+                         (round_robin_id, participant_id, name, discord_name, discord_webhook, 
                           lead_limit, queue_position, is_external) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               id,
               participantId,
-              participant.userId || null,
               participant.name,
               participant.discordName || null,
               participant.discordWebhook || null,
@@ -387,6 +742,37 @@ class RoundRobin {
           );
         }
       }
+
+      // Remove participants that are no longer in the list (but only if they have no leads)
+      for (const existingParticipant of currentParticipants) {
+        if (!participantsToKeep.has(existingParticipant.id)) {
+          // Check if this participant has any leads
+          const [leadCount] = await connection.execute(
+            "SELECT COUNT(*) as count FROM leads WHERE participant_id = ?",
+            [existingParticipant.id]
+          );
+
+          if (leadCount[0].count === 0) {
+            // Safe to delete - no leads associated
+            await connection.execute(
+              "DELETE FROM rr_participants WHERE id = ?",
+              [existingParticipant.id]
+            );
+          } else {
+            // Mark as inactive instead of deleting to preserve lead history
+            await connection.execute(
+              "UPDATE rr_participants SET is_active = FALSE WHERE id = ?",
+              [existingParticipant.id]
+            );
+          }
+        }
+      }
+
+      // Update lead sources (these can be safely deleted and recreated)
+      await connection.execute(
+        "DELETE FROM lead_sources WHERE round_robin_id = ?",
+        [id]
+      );
 
       // Insert updated lead sources
       if (leadSources.length > 0) {
@@ -450,37 +836,25 @@ class RoundRobin {
   }
 
   // Get dashboard statistics
-  static async getDashboardStats(userId = null) {
+  static async getDashboardStats() {
     try {
-      let whereClause = "";
-      let params = [];
-
-      if (userId) {
-        whereClause = "WHERE rr.created_by = ?";
-        params.push(parseInt(userId));
-      }
-
-      // Get basic stats
+      // Get basic stats - use REAL counts from leads table instead of cached counters
       const [statsRows] = await pool.execute(
         `SELECT 
                     COUNT(DISTINCT rr.id) as total_rrs,
                     COUNT(DISTINCT CASE WHEN rr.is_launched = TRUE THEN rr.id END) as active_rrs,
-                    COALESCE(SUM(rr.total_leads), 0) as total_leads,
+                    COALESCE(COUNT(DISTINCT l.id), 0) as total_leads,
                     COUNT(DISTINCT p.id) as total_participants
                  FROM round_robins rr
-                 LEFT JOIN rr_participants p ON rr.id = p.round_robin_id
-                 ${whereClause}`,
-        params
+                 LEFT JOIN rr_participants p ON rr.id = p.round_robin_id AND p.is_active = TRUE
+                 LEFT JOIN leads l ON rr.id = l.round_robin_id`
       );
 
       // Get today's leads
       const [todayRows] = await pool.execute(
         `SELECT COUNT(*) as today_leads
                  FROM leads l
-                 JOIN round_robins rr ON l.round_robin_id = rr.id
-                 WHERE DATE(l.received_at) = CURDATE()
-                 ${whereClause ? "AND rr.created_by = ?" : ""}`,
-        userId ? [parseInt(userId)] : []
+                 WHERE DATE(l.received_at) = CURDATE()`
       );
 
       return {
@@ -496,16 +870,22 @@ class RoundRobin {
   }
 
   // Send lead to Discord webhook
-  static async sendToDiscord(participantData, leadData, additionalData = [], leadId = null, roundRobinId = null) {
+  static async sendToDiscord(
+    participantData,
+    leadData,
+    additionalData = [],
+    leadId = null,
+    roundRobinId = null
+  ) {
     const startTime = Date.now();
-    
+
     // Log Discord attempt
     if (leadId && roundRobinId) {
       await LeadLogger.logDiscordAttempt(
-        leadId, 
-        roundRobinId, 
-        participantData.id, 
-        participantData.name, 
+        leadId,
+        roundRobinId,
+        participantData.id,
+        participantData.name,
         participantData.discord_webhook
       );
     }
@@ -514,10 +894,10 @@ class RoundRobin {
       const error = new Error("No Discord webhook configured");
       if (leadId && roundRobinId) {
         await LeadLogger.logDiscordFailure(
-          leadId, 
-          roundRobinId, 
-          participantData.id, 
-          participantData.name, 
+          leadId,
+          roundRobinId,
+          participantData.id,
+          participantData.name,
           error
         );
       }
@@ -566,10 +946,10 @@ class RoundRobin {
         // Log success
         if (leadId && roundRobinId) {
           await LeadLogger.logDiscordSuccess(
-            leadId, 
-            roundRobinId, 
-            participantData.id, 
-            participantData.name, 
+            leadId,
+            roundRobinId,
+            participantData.id,
+            participantData.name,
             responseTime
           );
         }
@@ -577,19 +957,19 @@ class RoundRobin {
       } else {
         const errorText = await response.text();
         const error = new Error(`HTTP ${response.status}: ${errorText}`);
-        
+
         // Log failure
         if (leadId && roundRobinId) {
           await LeadLogger.logDiscordFailure(
-            leadId, 
-            roundRobinId, 
-            participantData.id, 
-            participantData.name, 
-            error, 
+            leadId,
+            roundRobinId,
+            participantData.id,
+            participantData.name,
+            error,
             responseTime
           );
         }
-        
+
         return {
           success: false,
           reason: `HTTP ${response.status}: ${errorText}`,
@@ -597,19 +977,19 @@ class RoundRobin {
       }
     } catch (error) {
       const responseTime = Date.now() - startTime;
-      
+
       // Log error
       if (leadId && roundRobinId) {
         await LeadLogger.logDiscordFailure(
-          leadId, 
-          roundRobinId, 
-          participantData.id, 
-          participantData.name, 
-          error, 
+          leadId,
+          roundRobinId,
+          participantData.id,
+          participantData.name,
+          error,
           responseTime
         );
       }
-      
+
       return { success: false, reason: error.message };
     }
   }
@@ -632,15 +1012,31 @@ class RoundRobin {
         throw new Error("No participants found in round robin");
       }
 
-      // Get current participant
-      const currentParticipant =
-        roundRobin.participants[roundRobin.current_position];
+      // Check if this lead should be marked as junk
+      const junkCheck = await this.checkIfJunk(leadData.email, leadData.mobile_number || leadData.phone);
+      let leadStatus = "sent";
+      let statusReason = null;
+      
+      if (junkCheck.isJunk) {
+        leadStatus = "junk";
+        statusReason = junkCheck.reason;
+      }
+
+      // Get next available (non-paused) participant
+      const availableResult = this.getNextAvailableParticipant(roundRobin.participants, roundRobin.current_position);
+      
+      if (!availableResult) {
+        throw new Error("No available participants (all may be paused)");
+      }
+      
+      const currentParticipant = availableResult.participant;
+      const actualPosition = availableResult.position;
 
       // Insert the lead
       const [leadResult] = await connection.execute(
         `INSERT INTO leads 
-                 (round_robin_id, participant_id, name, phone, email, source_url, source_domain, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                 (round_robin_id, participant_id, name, phone, email, source_url, source_domain, status, status_reason) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           roundRobin.id,
           currentParticipant.id,
@@ -649,7 +1045,8 @@ class RoundRobin {
           leadData.email || null,
           leadData.source_url || sourceUrl,
           this.extractDomain(leadData.source_url || sourceUrl),
-          "sent",
+          leadStatus,
+          statusReason
         ]
       );
 
@@ -675,8 +1072,8 @@ class RoundRobin {
       );
 
       // Update round robin position and total leads
-      const nextPosition =
-        (roundRobin.current_position + 1) % roundRobin.participants.length;
+      // Move to next position from where we actually assigned the lead
+      const nextPosition = (actualPosition + 1) % roundRobin.participants.length;
       await connection.execute(
         `UPDATE round_robins 
                  SET current_position = ?, total_leads = total_leads + 1, updated_at = CURRENT_TIMESTAMP 
@@ -685,30 +1082,59 @@ class RoundRobin {
       );
 
       await connection.commit();
-      
+
       // Log lead assignment
-      await LeadLogger.logLeadAssigned(leadId, roundRobin.id, currentParticipant.id, currentParticipant.name);
+      await LeadLogger.logLeadAssigned(
+        leadId,
+        roundRobin.id,
+        currentParticipant.id,
+        currentParticipant.name
+      );
 
       // Send to Discord webhook (don't fail the lead distribution if Discord fails)
+      // Skip Discord notification for junk leads
       let discordResult = null;
-      try {
-        discordResult = await this.sendToDiscord(
-          currentParticipant,
-          leadData,
-          leadData.additional_data,
-          leadId,
-          roundRobin.id
-        );
-      } catch (discordError) {
-        await LeadLogger.logError(leadId, roundRobin.id, currentParticipant.id, discordError, {
-          context: 'discord_notification_with_additional_data',
-          leadData: { 
-            name: leadData.name, 
+      if (leadStatus === "junk") {
+        await LeadLogger.log({
+          leadId: leadId,
+          roundRobinId: roundRobin.id,
+          participantId: currentParticipant.id,
+          eventType: 'lead_marked_junk',
+          status: 'info',
+          message: `Lead automatically marked as junk - Discord notification skipped`,
+          details: { 
+            reason: statusReason,
             email: leadData.email,
-            additionalDataCount: leadData.additional_data?.length || 0
+            phone: leadData.mobile_number || leadData.phone
           }
         });
-        discordResult = { success: false, reason: discordError.message };
+        discordResult = { success: false, reason: "Lead marked as junk - Discord notification skipped" };
+      } else {
+        try {
+          discordResult = await this.sendToDiscord(
+            currentParticipant,
+            leadData,
+            leadData.additional_data,
+            leadId,
+            roundRobin.id
+          );
+        } catch (discordError) {
+          await LeadLogger.logError(
+            leadId,
+            roundRobin.id,
+            currentParticipant.id,
+            discordError,
+            {
+              context: "discord_notification_with_additional_data",
+              leadData: {
+                name: leadData.name,
+                email: leadData.email,
+                additionalDataCount: leadData.additional_data?.length || 0,
+              },
+            }
+          );
+          discordResult = { success: false, reason: discordError.message };
+        }
       }
 
       return {
@@ -741,9 +1167,8 @@ class RoundRobin {
       const domain = this.extractDomain(sourceUrl);
 
       const [rows] = await pool.execute(
-        `SELECT DISTINCT rr.*, u.name as created_by_name 
+        `SELECT DISTINCT rr.* 
                  FROM round_robins rr
-                 LEFT JOIN users u ON rr.created_by = u.id
                  LEFT JOIN lead_sources ls ON rr.id = ls.round_robin_id
                  WHERE (ls.url = ? OR ls.domain = ?) 
                    AND rr.is_launched = TRUE 
@@ -758,7 +1183,7 @@ class RoundRobin {
       // Get participants
       const [participants] = await pool.execute(
         `SELECT * FROM rr_participants 
-                 WHERE round_robin_id = ? 
+                 WHERE round_robin_id = ? AND is_active = TRUE
                  ORDER BY queue_position`,
         [roundRobin.id]
       );

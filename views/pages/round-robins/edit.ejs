@@ -59,11 +59,7 @@
                     <div class="url-selector">
                         <select id="urlDropdown" onchange="addUrlFromDropdown()">
                             <option value="">Select from existing URLs...</option>
-                            <option value="https://propertyguru.com.sg">PropertyGuru Singapore</option>
-                            <option value="https://srx.com.sg">SRX Property</option>
-                            <option value="https://99.co">99.co Singapore</option>
-                            <option value="https://edgeprop.sg">EdgeProp</option>
-                            <option value="https://iproperty.com.sg">iProperty</option>
+                            <!-- Options will be loaded from database via JavaScript -->
                         </select>
                         <div style="margin: 10px 0; text-align: center; color: #6c757d;">OR</div>
                         <div class="url-input-group">
@@ -113,6 +109,7 @@
         // Global variables for edit form
         let selectedUrls = [];
         let availableParticipants = [];
+        let masterUrls = [];
         let currentRoundRobin = <%- JSON.stringify(roundRobin) %>;
 
         // Initialize edit form
@@ -127,8 +124,9 @@
             // Initialize URL selection
             initializeUrlSelection();
             
-            // Load participants
+            // Load participants and URLs
             loadParticipants();
+            loadMasterUrls();
             
             // Load existing data
             loadExistingData();
@@ -154,7 +152,7 @@
             const personDiv = document.createElement('div');
             personDiv.className = 'person-field';
             
-            if (participant.user_id && !participant.is_external) {
+            if (participant.participant_id && !participant.is_external) {
                 // Existing participant from participants table
                 personDiv.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -162,7 +160,7 @@
                         <button type="button" class="btn-danger" onclick="this.parentElement.parentElement.remove()">Remove</button>
                     </div>
                     
-                    <input type="hidden" class="participant-id" value="${participant.user_id}">
+                    <input type="hidden" class="participant-id" value="${participant.participant_id}">
                     <input type="hidden" class="person-name" value="${participant.name}">
                     <input type="hidden" class="person-discord" value="${participant.discord_name}">
                     <input type="hidden" class="person-webhook" value="${participant.discord_webhook}">
@@ -181,12 +179,15 @@
                     </div>
                 `;
             } else {
-                // External participant
+                // External participant - check if they have a participant_id from being previously external but now in participants table
+                const participantIdValue = participant.participant_id || '';
                 personDiv.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h4 style="color: #002655;">Person ${container.children.length + 1}</h4>
                         <button type="button" class="btn-danger" onclick="this.parentElement.parentElement.remove()">Remove</button>
                     </div>
+                    
+                    <input type="hidden" class="participant-id" value="${participantIdValue}">
                     
                     <div class="form-group">
                         <label>Name</label>
@@ -221,6 +222,45 @@
                 .catch(error => {
                     console.error('Error loading participants:', error);
                 });
+        }
+
+        // Load master URLs from API
+        function loadMasterUrls() {
+            fetch('/api/master-urls')
+                .then(response => response.json())
+                .then(urls => {
+                    masterUrls = urls;
+                    updateUrlDropdown();
+                })
+                .catch(error => {
+                    console.error('Error loading master URLs:', error);
+                    // If API fails, fall back to hardcoded URLs
+                    masterUrls = [
+                        { url: 'https://propertyguru.com.sg', display_name: 'PropertyGuru Singapore' },
+                        { url: 'https://srx.com.sg', display_name: 'SRX Property' },
+                        { url: 'https://99.co', display_name: '99.co Singapore' },
+                        { url: 'https://edgeprop.sg', display_name: 'EdgeProp' },
+                        { url: 'https://iproperty.com.sg', display_name: 'iProperty' }
+                    ];
+                    updateUrlDropdown();
+                });
+        }
+
+        function updateUrlDropdown() {
+            const dropdown = document.getElementById('urlDropdown');
+            
+            // Clear existing options (except the first one)
+            while (dropdown.children.length > 1) {
+                dropdown.removeChild(dropdown.lastChild);
+            }
+
+            // Add URL options from database
+            masterUrls.forEach(urlData => {
+                const option = document.createElement('option');
+                option.value = urlData.url;
+                option.textContent = urlData.display_name || urlData.url;
+                dropdown.appendChild(option);
+            });
         }
 
         function updateParticipantDropdown() {
@@ -354,13 +394,14 @@
                 const leadLimit = field.querySelector('.lead-limit').value;
                 
                 if (name && discordName && webhook) {
+                    const participantId = participantIdInput && participantIdInput.value ? parseInt(participantIdInput.value) : null;
                     participants.push({
-                        userId: participantIdInput ? parseInt(participantIdInput.value) : null,
+                        participantId: participantId,
                         name: name,
                         discordName: discordName,
                         discordWebhook: webhook,
                         leadLimit: parseInt(leadLimit) || 15,
-                        isExternal: !participantIdInput // New person if no participant ID
+                        isExternal: !participantId // Only external if no valid participant ID
                     });
                 }
             });
@@ -451,19 +492,83 @@
             }
         }
 
-        function addNewUrl() {
+        async function addNewUrl() {
             const input = document.getElementById('newUrlInput');
             const newUrl = input.value.trim();
-            
-            if (newUrl && isValidUrl(newUrl) && !selectedUrls.includes(newUrl)) {
-                selectedUrls.push(newUrl);
-                updateUrlDisplay();
-                input.value = '';
-            } else if (newUrl && !isValidUrl(newUrl)) {
-                alert('Please enter a valid URL (must start with http:// or https://)');
-            } else if (selectedUrls.includes(newUrl)) {
-                alert('This URL has already been added');
+
+            if (!newUrl) {
+                alert('Please enter a URL');
+                return;
             }
+
+            if (!isValidUrl(newUrl)) {
+                alert('Please enter a valid URL (must start with http:// or https://)');
+                return;
+            }
+
+            if (selectedUrls.includes(newUrl)) {
+                alert('This URL has already been added to this round robin');
+                return;
+            }
+
+            try {
+                // Save URL to database
+                const response = await fetch('/api/master-urls', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: newUrl })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Add to selected URLs for this round robin
+                    selectedUrls.push(newUrl);
+                    updateUrlDisplay();
+                    input.value = '';
+
+                    // Update the master URLs list and dropdown
+                    if (!masterUrls.find(u => u.url === newUrl)) {
+                        masterUrls.push(result.url);
+                        updateUrlDropdown();
+                    }
+
+                    // Show success message
+                    showSuccessMessage('URL saved and added to round robin!');
+                } else {
+                    if (result.error === 'URL already exists') {
+                        // URL exists in database but not selected for this RR
+                        selectedUrls.push(newUrl);
+                        updateUrlDisplay();
+                        input.value = '';
+                        showSuccessMessage('URL added to round robin!');
+                    } else {
+                        alert('Error saving URL: ' + result.error);
+                    }
+                }
+            } catch (error) {
+                console.error('Error adding URL:', error);
+                alert('Failed to save URL. Please try again.');
+            }
+        }
+
+        function showSuccessMessage(message) {
+            const successDiv = document.createElement('div');
+            successDiv.style.cssText = `
+                position: fixed; top: 20px; right: 20px; z-index: 9999;
+                background: #28a745; color: white; padding: 10px 15px;
+                border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            `;
+            successDiv.textContent = message;
+            document.body.appendChild(successDiv);
+
+            setTimeout(() => {
+                if (successDiv.parentNode) {
+                    successDiv.parentNode.removeChild(successDiv);
+                }
+            }, 3000);
         }
 
         function isValidUrl(string) {

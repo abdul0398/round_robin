@@ -1,14 +1,15 @@
 const express = require('express');
 const RoundRobin = require('../models/RoundRobin');
 const Participant = require('../models/Participant');
-const { requireAuth } = require('../middleware/auth');
+const MasterUrl = require('../models/MasterUrl');
 const { requireBearerToken } = require('../middleware/bearerAuth');
+const { requireAdminAuth } = require('../middleware/adminAuth');
 const LeadLogger = require('../utils/LeadLogger');
 
 const router = express.Router();
 
 // API to get participants for round robin creation
-router.get('/participants', requireAuth, async (req, res) => {
+router.get('/participants', async (req, res) => {
     try {
         const participants = await Participant.findActive();
         res.json(participants);
@@ -19,11 +20,247 @@ router.get('/participants', requireAuth, async (req, res) => {
     }
 });
 
-// API to get dashboard stats
-router.get('/dashboard/stats', requireAuth, async (req, res) => {
+// API to get all participants with pagination
+router.get('/participants/all', requireAdminAuth, async (req, res) => {
     try {
-        const userId = res.locals.currentUser.role === 'admin' ? null : req.session.userId;
-        const stats = await RoundRobin.getDashboardStats(userId);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        
+        const result = await Participant.findAll(page, limit);
+        res.json(result);
+        
+    } catch (error) {
+        console.error('API participants all error:', error);
+        res.status(500).json({ error: 'Failed to fetch participants' });
+    }
+});
+
+// API to create a new participant
+router.post('/participants', requireAdminAuth, async (req, res) => {
+    try {
+        const { name, discordName, discordWebhook } = req.body;
+        
+        // Validate input
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'Participant name is required' });
+        }
+        
+        if (!discordName || !discordName.trim()) {
+            return res.status(400).json({ error: 'Discord name is required' });
+        }
+        
+        if (!discordWebhook || !discordWebhook.trim()) {
+            return res.status(400).json({ error: 'Discord webhook is required' });
+        }
+        
+        // Validate webhook URL format
+        try {
+            new URL(discordWebhook);
+        } catch (error) {
+            return res.status(400).json({ error: 'Invalid Discord webhook URL format' });
+        }
+        
+        // Check for unique name
+        const existingParticipants = await Participant.findActive();
+        const nameExists = existingParticipants.some(p => 
+            p.name.toLowerCase().trim() === name.toLowerCase().trim()
+        );
+        
+        if (nameExists) {
+            return res.status(400).json({ error: 'A participant with this name already exists' });
+        }
+        
+        const participantId = await Participant.create({
+            name: name.trim(),
+            discordName: discordName.trim(),
+            discordWebhook: discordWebhook.trim()
+        });
+        
+        res.json({ 
+            success: true, 
+            participantId,
+            message: 'Participant created successfully' 
+        });
+        
+    } catch (error) {
+        console.error('API create participant error:', error);
+        res.status(500).json({ error: 'Failed to create participant' });
+    }
+});
+
+// API to update a participant
+router.put('/participants/:id', requireAdminAuth, async (req, res) => {
+    try {
+        const { name, discordName, discordWebhook } = req.body;
+        const participantId = parseInt(req.params.id);
+        
+        // Validate input
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'Participant name is required' });
+        }
+        
+        if (!discordName || !discordName.trim()) {
+            return res.status(400).json({ error: 'Discord name is required' });
+        }
+        
+        if (!discordWebhook || !discordWebhook.trim()) {
+            return res.status(400).json({ error: 'Discord webhook is required' });
+        }
+        
+        // Validate webhook URL format
+        try {
+            new URL(discordWebhook);
+        } catch (error) {
+            return res.status(400).json({ error: 'Invalid Discord webhook URL format' });
+        }
+        
+        // Check if participant exists
+        const existingParticipant = await Participant.findById(participantId);
+        if (!existingParticipant) {
+            return res.status(404).json({ error: 'Participant not found' });
+        }
+        
+        // Check for unique name (excluding current participant)
+        const allParticipants = await Participant.findActive();
+        const nameExists = allParticipants.some(p => 
+            p.id !== participantId && 
+            p.name.toLowerCase().trim() === name.toLowerCase().trim()
+        );
+        
+        if (nameExists) {
+            return res.status(400).json({ error: 'A participant with this name already exists' });
+        }
+        
+        const success = await Participant.update(participantId, {
+            name: name.trim(),
+            discordName: discordName.trim(),
+            discordWebhook: discordWebhook.trim()
+        });
+        
+        if (success) {
+            res.json({ 
+                success: true,
+                message: 'Participant updated successfully' 
+            });
+        } else {
+            res.status(404).json({ error: 'Participant not found' });
+        }
+        
+    } catch (error) {
+        console.error('API update participant error:', error);
+        res.status(500).json({ error: 'Failed to update participant' });
+    }
+});
+
+// API to delete a participant
+router.delete('/participants/:id', requireAdminAuth, async (req, res) => {
+    try {
+        const participantId = parseInt(req.params.id);
+        
+        // Check if participant exists
+        const existingParticipant = await Participant.findById(participantId);
+        if (!existingParticipant) {
+            return res.status(404).json({ error: 'Participant not found' });
+        }
+        
+        const success = await Participant.delete(participantId);
+        
+        if (success) {
+            res.json({ 
+                success: true,
+                message: 'Participant deleted successfully' 
+            });
+        } else {
+            res.status(404).json({ error: 'Participant not found' });
+        }
+        
+    } catch (error) {
+        console.error('API delete participant error:', error);
+        res.status(500).json({ error: 'Failed to delete participant' });
+    }
+});
+
+// API to get all master URLs for dropdown
+router.get('/master-urls', async (req, res) => {
+    try {
+        const urls = await MasterUrl.findAll();
+        res.json(urls);
+        
+    } catch (error) {
+        console.error('API master URLs error:', error);
+        res.status(500).json({ error: 'Failed to fetch URLs' });
+    }
+});
+
+// API to add a new URL to master list
+router.post('/master-urls', requireAdminAuth, async (req, res) => {
+    try {
+        const { url } = req.body;
+        
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+        
+        // Validate URL format
+        try {
+            new URL(url);
+        } catch (error) {
+            return res.status(400).json({ error: 'Invalid URL format' });
+        }
+        
+        const urlData = await MasterUrl.addUrl(url);
+        res.json({ 
+            success: true, 
+            url: urlData,
+            message: 'URL added successfully' 
+        });
+        
+    } catch (error) {
+        console.error('API add URL error:', error);
+        
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'URL already exists' });
+        }
+        
+        res.status(500).json({ error: 'Failed to add URL' });
+    }
+});
+
+// API to search URLs
+router.get('/master-urls/search', async (req, res) => {
+    try {
+        const { q } = req.query;
+        
+        if (!q) {
+            return res.status(400).json({ error: 'Search query is required' });
+        }
+        
+        const urls = await MasterUrl.searchUrls(q);
+        res.json(urls);
+        
+    } catch (error) {
+        console.error('API search URLs error:', error);
+        res.status(500).json({ error: 'Failed to search URLs' });
+    }
+});
+
+// API to get popular URLs
+router.get('/master-urls/popular', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 10;
+        const urls = await MasterUrl.getPopularUrls(limit);
+        res.json(urls);
+        
+    } catch (error) {
+        console.error('API popular URLs error:', error);
+        res.status(500).json({ error: 'Failed to fetch popular URLs' });
+    }
+});
+
+// API to get dashboard stats
+router.get('/dashboard/stats', async (req, res) => {
+    try {
+        const stats = await RoundRobin.getDashboardStats();
         res.json({ stats });
         
     } catch (error) {
@@ -33,13 +270,12 @@ router.get('/dashboard/stats', requireAuth, async (req, res) => {
 });
 
 // API to get round robins
-router.get('/round-robins', requireAuth, async (req, res) => {
+router.get('/round-robins', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
-        const userId = res.locals.currentUser.role === 'admin' ? null : req.session.userId;
         
-        const result = await RoundRobin.findAll(userId, page, limit);
+        const result = await RoundRobin.findAll(page, limit);
         res.json(result);
         
     } catch (error) {
@@ -48,8 +284,179 @@ router.get('/round-robins', requireAuth, async (req, res) => {
     }
 });
 
+// API to get leads for a specific round robin with pagination
+router.get('/round-robins/:id/leads', requireAdminAuth, async (req, res) => {
+    try {
+        const roundRobinId = parseInt(req.params.id);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        
+        // Check if round robin exists
+        const roundRobin = await RoundRobin.findById(roundRobinId);
+        if (!roundRobin) {
+            return res.status(404).json({ error: 'Round robin not found' });
+        }
+        
+        const result = await RoundRobin.getLeads(roundRobinId, page, limit);
+        res.json(result);
+        
+    } catch (error) {
+        console.error('API round robin leads error:', error);
+        res.status(500).json({ error: 'Failed to fetch leads' });
+    }
+});
+
+// API to pause/unpause a participant in a round robin
+router.post('/round-robins/:id/participants/:participantId/toggle-pause', requireAdminAuth, async (req, res) => {
+    try {
+        const roundRobinId = parseInt(req.params.id);
+        const participantId = parseInt(req.params.participantId);
+        const { isPaused, reason } = req.body;
+        
+        if (typeof isPaused !== 'boolean') {
+            return res.status(400).json({ error: 'isPaused must be a boolean value' });
+        }
+        
+        const result = await RoundRobin.toggleParticipantPause(
+            roundRobinId, 
+            participantId, 
+            isPaused, 
+            reason || ''
+        );
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json({ error: result.error });
+        }
+        
+    } catch (error) {
+        console.error('Toggle participant pause error:', error);
+        res.status(500).json({ error: 'Failed to update participant pause status' });
+    }
+});
+
+// API to mark a lead as junk
+router.post('/leads/:id/mark-junk', requireAdminAuth, async (req, res) => {
+    try {
+        const leadId = parseInt(req.params.id);
+        const { reason } = req.body;
+        
+        const result = await RoundRobin.markLeadAsJunk(leadId, reason || 'Marked as junk by admin');
+        
+        if (result.success) {
+            res.json({ 
+                success: true, 
+                message: 'Lead marked as junk successfully',
+                junkRulesCreated: result.junkRulesCreated
+            });
+        } else {
+            res.status(400).json({ error: result.error });
+        }
+        
+    } catch (error) {
+        console.error('Mark lead as junk error:', error);
+        res.status(500).json({ error: 'Failed to mark lead as junk' });
+    }
+});
+
+// API to export leads as CSV for a specific round robin
+router.get('/round-robins/:id/leads/export', requireAdminAuth, async (req, res) => {
+    try {
+        const roundRobinId = parseInt(req.params.id);
+        
+        // Check if round robin exists
+        const roundRobin = await RoundRobin.findById(roundRobinId);
+        if (!roundRobin) {
+            return res.status(404).json({ error: 'Round robin not found' });
+        }
+        
+        // Get all leads (no pagination limit for export)
+        const result = await RoundRobin.getLeads(roundRobinId, 1, 999999);
+        const leads = result.leads;
+        
+        if (leads.length === 0) {
+            return res.status(400).json({ error: 'No leads to export' });
+        }
+        
+        // Generate CSV content
+        const csvHeaders = [
+            'Date/Time',
+            'Lead Name',
+            'Phone',
+            'Email', 
+            'Assigned To',
+            'Source URL',
+            'Status',
+            'Additional Data'
+        ];
+        
+        let csvContent = csvHeaders.join(',') + '\n';
+        
+        leads.forEach(lead => {
+            // Format additional data as JSON string or key-value pairs
+            let additionalDataStr = '';
+            if (lead.additional_data && lead.additional_data.length > 0) {
+                additionalDataStr = lead.additional_data
+                    .map(field => `${field.field_key}: ${field.field_value}`)
+                    .join('; ');
+            }
+            
+            // Format date and time in short form: "2:05pm, 12/02/2025"
+            const dateObj = new Date(lead.received_at);
+            const timeStr = dateObj.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit', 
+                hour12: true 
+            }).toLowerCase();
+            const dateStr = dateObj.toLocaleDateString('en-US', {
+                month: '2-digit',
+                day: '2-digit', 
+                year: 'numeric'
+            });
+            const shortDateTime = `${timeStr}, ${dateStr}`;
+            
+            const csvRow = [
+                escapeCSV(shortDateTime),
+                escapeCSV(lead.name || ''),
+                escapeCSV(lead.phone || ''),
+                escapeCSV(lead.email || ''),
+                escapeCSV(lead.participant_name || ''),
+                escapeCSV(lead.source_url || ''),
+                escapeCSV(lead.status || ''),
+                escapeCSV(additionalDataStr)
+            ];
+            
+            csvContent += csvRow.join(',') + '\n';
+        });
+        
+        // Helper function to escape CSV values
+        function escapeCSV(value) {
+            if (!value) return '""';
+            const stringValue = String(value);
+            // Escape quotes and wrap in quotes if contains comma, quote, or newline
+            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                return `"${stringValue.replace(/"/g, '""')}"`;
+            }
+            return `"${stringValue}"`;
+        }
+        
+        // Set headers for file download
+        const fileName = `leads_${roundRobin.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Cache-Control', 'no-cache');
+        
+        res.send(csvContent);
+        
+    } catch (error) {
+        console.error('API export leads error:', error);
+        res.status(500).json({ error: 'Failed to export leads' });
+    }
+});
+
 // API to update participant order
-router.post('/round-robins/:id/reorder-participants', requireAuth, async (req, res) => {
+router.post('/round-robins/:id/reorder-participants', async (req, res) => {
     try {
         const { participantIds } = req.body;
         
@@ -57,11 +464,6 @@ router.post('/round-robins/:id/reorder-participants', requireAuth, async (req, r
         
         if (!roundRobin) {
             return res.status(404).json({ error: 'Round robin not found' });
-        }
-        
-        // Check permission
-        if (res.locals.currentUser.role !== 'admin' && roundRobin.created_by !== req.session.userId) {
-            return res.status(403).json({ error: 'Access denied' });
         }
         
         // Note: Reordering is allowed even for launched round robins
@@ -141,7 +543,7 @@ router.post('/webhook/lead/:roundRobinId', requireBearerToken, async (req, res) 
 });
 
 // API to get webhook information and authentication details
-router.get('/webhook/info/:roundRobinId', requireAuth, async (req, res) => {
+router.get('/webhook/info/:roundRobinId', async (req, res) => {
     try {
         const { roundRobinId } = req.params;
         
@@ -149,11 +551,6 @@ router.get('/webhook/info/:roundRobinId', requireAuth, async (req, res) => {
         
         if (!roundRobin) {
             return res.status(404).json({ error: 'Round robin not found' });
-        }
-        
-        // Check permission
-        if (res.locals.currentUser.role !== 'admin' && roundRobin.created_by !== req.session.userId) {
-            return res.status(403).json({ error: 'Access denied' });
         }
         
         const webhookInfo = {
@@ -379,7 +776,7 @@ router.get('/webhook/test/:roundRobinId', async (req, res) => {
 });
 
 // API to get lead logs
-router.get('/logs/lead/:leadId', requireAuth, async (req, res) => {
+router.get('/logs/lead/:leadId', async (req, res) => {
     try {
         const logs = await LeadLogger.getLeadLogs(req.params.leadId);
         res.json({ logs });
@@ -390,7 +787,7 @@ router.get('/logs/lead/:leadId', requireAuth, async (req, res) => {
 });
 
 // API to get round robin logs
-router.get('/logs/round-robin/:roundRobinId', requireAuth, async (req, res) => {
+router.get('/logs/round-robin/:roundRobinId', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 100;
         const logs = await LeadLogger.getRoundRobinLogs(req.params.roundRobinId, limit);
@@ -402,7 +799,7 @@ router.get('/logs/round-robin/:roundRobinId', requireAuth, async (req, res) => {
 });
 
 // API to get error logs
-router.get('/logs/errors', requireAuth, async (req, res) => {
+router.get('/logs/errors', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 50;
         const logs = await LeadLogger.getErrorLogs(limit);
@@ -414,7 +811,7 @@ router.get('/logs/errors', requireAuth, async (req, res) => {
 });
 
 // API to get Discord statistics
-router.get('/logs/discord-stats/:roundRobinId?', requireAuth, async (req, res) => {
+router.get('/logs/discord-stats/:roundRobinId?', async (req, res) => {
     try {
         const roundRobinId = req.params.roundRobinId || null;
         const days = parseInt(req.query.days) || 7;
